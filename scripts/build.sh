@@ -18,6 +18,9 @@
 #   -v, --version <ver>          deepmd-kit version          (default: $VERSION or 3.1.3)
 #   -c, --cuda <ver>             CUDA version, e.g. 12.9;
 #                                empty/omitted = CPU build    (default: $CUDA_VERSION or "")
+#   --torch-version <ver>        pin PyTorch version in the installer (default: none = no torch)
+#   --backend <name>             ML backends to bundle: all (default), tensorflow, pytorch, jax
+#   --glibc <ver>                target system GLIBC version; also sets CONDA_OVERRIDE_GLIBC
 #   --from-commit-channel <dir>  local channel from build_pkg_from_commit.sh;
 #                                reads <dir>/COMMIT_BUILD.env to pin version+build+cuda+python
 #   -r, --recipe-dir <dir>       dir containing construct.yaml (default: bundled assets/)
@@ -48,6 +51,10 @@ DEEPMD_BUILD="${DEEPMD_BUILD:-}"
 DEEPMD_LOCAL_CHANNEL="${DEEPMD_LOCAL_CHANNEL:-}"
 DEEPMD_PY_VERSION="${DEEPMD_PY_VERSION:-}"
 DEEPMD_COMMIT=""
+# New: version+hardware parameterization (mentor requirement)
+DP_BACKEND="${DP_BACKEND:-all}"
+TORCH_VERSION="${TORCH_VERSION:-}"
+TARGET_GLIBC="${TARGET_GLIBC:-}"
 
 usage() { awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "${BASH_SOURCE[0]}"; }
 fail() { echo "BUILD FAILED: $*" >&2; exit 1; }
@@ -58,6 +65,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -v|--version)             VERSION="$2"; shift 2 ;;
     -c|--cuda)                CUDA_VERSION="$2"; shift 2 ;;
+    --torch-version)          TORCH_VERSION="$2"; shift 2 ;;
+    --backend)                DP_BACKEND="$2"; shift 2 ;;
+    --glibc)                  TARGET_GLIBC="$2"; shift 2 ;;
     --from-commit-channel)    COMMIT_CHANNEL="$2"; shift 2 ;;
     -r|--recipe-dir)          RECIPE_DIR="$2"; shift 2 ;;
     -o|--output-dir)          OUTPUT_DIR="$2"; shift 2 ;;
@@ -90,13 +100,13 @@ if [[ -n "$COMMIT_CHANNEL" ]]; then
   echo "    pinned version=$VERSION build=${DEEPMD_BUILD:-<variant>} py=${DEEPMD_PY_VERSION:-?} cuda=${CUDA_VERSION:-CPU}"
 fi
 
-export VERSION CUDA_VERSION DEEPMD_BUILD DEEPMD_LOCAL_CHANNEL DEEPMD_PY_VERSION
+export VERSION CUDA_VERSION DEEPMD_BUILD DEEPMD_LOCAL_CHANNEL DEEPMD_PY_VERSION DP_BACKEND TORCH_VERSION TARGET_GLIBC
 
 # --- GPU build needs virtual-package overrides so a GPU-LESS build node can
 #     solve+download the CUDA variant (matches upstream installer CI) ----------
 if [[ -n "$CUDA_VERSION" ]]; then
   export CONDA_OVERRIDE_CUDA="$CUDA_VERSION"
-  export CONDA_OVERRIDE_GLIBC="${CONDA_OVERRIDE_GLIBC:-2.28}"
+  export CONDA_OVERRIDE_GLIBC="${CONDA_OVERRIDE_GLIBC:-${TARGET_GLIBC:-2.28}}"
   export CONDA_SOLVER="${CONDA_SOLVER:-libmamba}"
 fi
 

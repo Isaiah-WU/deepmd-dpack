@@ -1,30 +1,24 @@
 {#
-  Reproducibility note (the source of "sometimes works, sometimes fails"):
-  constructor downloads these packages at BUILD time. Any spec left floating can
-  resolve to a different version on a later build, or break when an upstream
-  package is updated/removed. For a stable, mentor-grade build:
-    1. Keep channels pinned (below).
-    2. Pin the major movers via env vars (VERSION/TF_VERSION/LAMMPS_VERSION/...).
-    3. After a green build, run scripts/freeze.sh to capture EXACT versions, then
-       paste those exact pins here for byte-stable rebuilds.
-  WARNING: the `deepmd-kit_rc` label holds release CANDIDATES that get rotated /
-  removed. For a stable release build, point at the stable conda-forge label
-  instead (override DEEPMD_CHANNEL or edit the channels list).
+  Version parameterization (mentor requirement):
+  "想打包什么版本的就打包什么版本" — every version knob is exposed as a build
+  parameter, no hard-coding. See scripts/build.sh for the input flags.
 #}
 {% set version       = os.environ.get("VERSION") %}
 {% set cuda_version  = os.environ.get("CUDA_VERSION") %}
 {% set tf_version    = os.environ.get("TF_VERSION")    or ">=2.19" %}
 {% set lammps_version= os.environ.get("LAMMPS_VERSION") or "" %}
 {% set flax_version  = os.environ.get("FLAX_VERSION")  or ">=0.10.0" %}
-{# Commit-keyed packaging: build_pkg_from_commit.sh builds a commit into a local
-   channel and sets these. When DEEPMD_BUILD is set, deepmd-kit is pinned to that
-   EXACT build string (the commit build) instead of the {variant}* selector. #}
+{% set torch_version = os.environ.get("TORCH_VERSION")  or "" %}
+{% set backend       = os.environ.get("DP_BACKEND")     or "all" %}
+{% set glibc         = os.environ.get("TARGET_GLIBC")   or "" %}
+{# Commit-keyed packaging: build_pkg_from_commit.sh emits these. #}
 {% set local_channel = os.environ.get("DEEPMD_LOCAL_CHANNEL") or "" %}
 {% set build_string  = os.environ.get("DEEPMD_BUILD") or "" %}
-{# A commit build is compiled against ONE python ABI (encoded in its build string).
-   Co-pin python so the floating tensorflow/lammps specs can't drag in an
-   incompatible interpreter and leave the solve unsatisfiable. #}
 {% set py_version    = os.environ.get("DEEPMD_PY_VERSION") or "" %}
+{# Backend booleans #}
+{% set with_tf  = backend in ("all","tensorflow") %}
+{% set with_pt  = backend in ("all","pytorch") and torch_version %}
+{% set with_jax = backend in ("all","jax") %}
 {% if cuda_version == '' %}
 {% set variant = "cpu" %}
 {% set variant_version = "cpu" %}
@@ -61,12 +55,19 @@ specs:
 - openmpi
 {% endif %}
 - libblas * *mkl
+{% if with_tf %}
 - tensorflow {{ tf_version }}
+{% endif %}
+{% if with_pt %}
+- pytorch {{ torch_version }}
+{% endif %}
+{% if with_jax %}
 # jax
 - jax
 - jaxlib * {{ variant }}*
 - flax {{ flax_version }}
 - orbax-checkpoint
+{% endif %}
 
 ignore_duplicate_files: True
 

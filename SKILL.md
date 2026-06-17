@@ -11,7 +11,7 @@ compatibility: Requires conda. Internet access needed at build time. Builds CPU 
 license: LGPL-3.0-or-later
 metadata:
   author: Isaiah-WU
-  version: '1.2'
+  version: '1.3'
 ---
 
 # DeePMD-kit Offline Installer (local build)
@@ -54,6 +54,17 @@ bash scripts/verify_offline.sh dist/*.sh
 > Stage 1 (building a commit from source) must be validated on Linux against the
 > live conda-forge feedstock — see [references/notes.md](references/notes.md).
 
+The verify step NO LONGER stops at `dp -h` — it runs `dp train` + `dp freeze` +
+`lammps` inference in a clean, network-isolated environment. That is the real bar.
+
+**Backend + version parameterization (mentor requirement):**
+
+```bash
+# Default (TF + JAX); specify backend and pin versions:
+bash scripts/build.sh --version 3.1.3 --backend pytorch --torch-version ">=2.5"
+bash scripts/build.sh --version 3.1.3 --cuda 12.9 --glibc 2.28 --torch-version ">=2.5"
+```
+
 A build is only "done" when the **verify step passes**, not when a `.sh` appears.
 
 ## Why two modes
@@ -68,19 +79,25 @@ then constructor consumes it (Stage 2). Releases (Mode A) skip Stage 1.
 1. Confirm conda is available (`conda --version`). `build.sh` installs
    `constructor` / `conda-libmamba-solver` itself if missing.
 2. Decide the mode: released **version** → Mode A; a deepmd-kit **commit** → Mode B.
-3. Collect CPU-vs-CUDA (`--cuda <ver>`, recommend `12.9` for GPU).
-4. Run the bundled scripts with those parameters. Never run raw `constructor`
+3. Collect CPU-vs-CUDA (`--cuda <ver>`, recommend `12.9` for GPU) and target
+   hardware (`--glibc <ver>` for the target system's GLIBC).
+4. Collect **backend selection** (`--backend all|tensorflow|pytorch|jax`) and
+   version pins (`--torch-version`, `TF_VERSION`/`LAMMPS_VERSION` envs).
+5. Run the bundled scripts with those parameters. Never run raw `constructor`
    or `conda build` commands — the scripts freeze the error-prone steps.
-5. Run `scripts/verify_offline.sh` (GPU mode auto-detected from the filename;
-   GPU verify MUST run on a node with an NVIDIA GPU + driver).
-6. Report the manifest (absolute path + size + sha256) and the verify result.
+6. Run `scripts/verify_offline.sh`. The bar is: installs offline → `dp train`
+   on a minimal system → `dp freeze` → `lammps` inference with the frozen model.
+   GPU mode auto-detected from filename; MUST run on a node with GPU+driver.
 
 ## Key parameters
 
 | Flag / env                | Meaning                                       | Default     |
 | ------------------------- | --------------------------------------------- | ----------- |
 | `--version`               | deepmd-kit version (Mode A)                    | 3.1.3       |
-| `--cuda`                  | CUDA version; omit/empty = CPU build           | "" (CPU)    |
+| `--cuda`                  | CUDA version; omit = CPU                       | "" (CPU)    |
+| `--glibc`                 | target system GLIBC version                    | 2.28 (CPU)  |
+| `--backend`               | ML backends: all / tensorflow / pytorch / jax  | all         |
+| `--torch-version`         | pin PyTorch version (enables pytorch in bundle) | —           |
 | `--from-commit-channel`   | local channel from Stage 1 (Mode B)            | —           |
 | `--split <N>`             | split GPU `.sh` into N parts (GitHub 2GiB cap) | off         |
 | `--recipe-dir`            | recipe dir with construct.yaml                 | bundled `assets/` |
@@ -93,8 +110,8 @@ then constructor consumes it (Stage 2). Releases (Mode A) skip Stage 1.
 - [ ] conda available
 - [ ] Mode A: `build.sh --version` (+ `--cuda` if GPU) — OR — Mode B: `build_pkg_from_commit.sh --commit` then `build.sh --from-commit-channel`
 - [ ] `.sh` installer produced; manifest reports absolute path + sha256
-- [ ] `verify_offline.sh` PASSED (installs + `dp -h`/`lmp -h` offline; GPU mode also checks `nvidia-smi` + TF GPU/XLA)
-- [ ] reported version matches the requested version/commit build
+- [ ] `verify_offline.sh` PASSED — the real bar: **dp train → dp freeze → lammps inference** in clean offline env; GPU mode also checks `nvidia-smi` + backend GPU + XLA/libdevice proof
+- [ ] reported version / commit / backend versions match what was requested
 
 ## Notes & troubleshooting
 
