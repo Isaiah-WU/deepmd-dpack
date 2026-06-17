@@ -3,8 +3,8 @@
   "想打包什么版本的就打包什么版本" — every version knob is exposed as a build
   parameter, no hard-coding. See scripts/build.sh for the input flags.
 #}
-{% set version       = os.environ.get("VERSION") %}
-{% set cuda_version  = os.environ.get("CUDA_VERSION") %}
+{% set version       = os.environ.get("VERSION") or "" %}
+{% set cuda_version  = os.environ.get("CUDA_VERSION") or "" %}
 {% set tf_version    = os.environ.get("TF_VERSION")    or ">=2.19" %}
 {% set lammps_version= os.environ.get("LAMMPS_VERSION") or "" %}
 {% set flax_version  = os.environ.get("FLAX_VERSION")  or ">=0.10.0" %}
