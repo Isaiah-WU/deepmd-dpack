@@ -164,7 +164,7 @@ BUILD_LOG="$OUTPUT_DIR/build-${VERSION}.log"
 echo "==> Running constructor (full log: $BUILD_LOG)"
 # Run in a subshell so we don't leave the caller in the recipe dir. pipefail
 # ensures a constructor failure (not tee's success) fails the build.
-( cd "$RECIPE_DIR" && constructor . --output-dir "$OUTPUT_DIR" ) 2>&1 | tee "$BUILD_LOG"
+( cd "$RECIPE_DIR" && constructor . --output-dir "$OUTPUT_DIR" --cache-dir "${CONSTRUCTOR_CACHE_DIR:-$OUTPUT_DIR/cache}" ) 2>&1 | tee "$BUILD_LOG"
 
 # --- post-build: confirm a CUDA build actually bundled cuda deepmd-kit --------
 # The manifest's "variant" reflects INTENT; this checks the produced contents so
