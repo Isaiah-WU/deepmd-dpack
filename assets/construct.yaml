@@ -1,30 +1,21 @@
-{#
-  Version parameterization (mentor requirement):
-  "想打包什么版本的就打包什么版本" — every version knob is exposed as a build
-  parameter, no hard-coding. See scripts/build.sh for the input flags.
-#}
-{% set version       = os.environ.get("VERSION") or "" %}
-{% set cuda_version  = os.environ.get("CUDA_VERSION") or "" %}
-{% set tf_version    = os.environ.get("TF_VERSION")    or ">=2.19" %}
-{% set lammps_version= os.environ.get("LAMMPS_VERSION") or "" %}
-{% set flax_version  = os.environ.get("FLAX_VERSION")  or ">=0.10.0" %}
-{% set torch_version = os.environ.get("TORCH_VERSION")  or "" %}
-{% set backend       = os.environ.get("DP_BACKEND")     or "all" %}
-{% set glibc         = os.environ.get("TARGET_GLIBC")   or "" %}
-{# Commit-keyed packaging: build_pkg_from_commit.sh emits these. #}
-{% set local_channel = os.environ.get("DEEPMD_LOCAL_CHANNEL") or "" %}
-{% set build_string  = os.environ.get("DEEPMD_BUILD") or "" %}
-{% set py_version    = os.environ.get("DEEPMD_PY_VERSION") or "" %}
-{# Backend booleans #}
-{% set with_tf  = backend in ("all","tensorflow") %}
-{% set with_pt  = backend in ("all","pytorch") and torch_version %}
+{% set version = os.environ.get("VERSION") %}
+{% set cuda_version = os.environ.get("CUDA_VERSION") %}
+{% set tf_version = os.environ.get("TF_VERSION", ">=2.19") %}
+{% set lammps_version = os.environ.get("LAMMPS_VERSION", "") %}
+{% set torch_version = os.environ.get("TORCH_VERSION", "") %}
+{% set backend = os.environ.get("DP_BACKEND", "all") %}
+{% set local_channel = os.environ.get("DEEPMD_LOCAL_CHANNEL", "") %}
+{% set build_string = os.environ.get("DEEPMD_BUILD", "") %}
+{% set py_version = os.environ.get("DEEPMD_PY_VERSION", "") %}
+{% set with_tf = backend in ("all","tensorflow") %}
+{% set with_pt = backend in ("all","pytorch") and torch_version %}
 {% set with_jax = backend in ("all","jax") %}
-{% if cuda_version == '' %}
-{% set variant = "cpu" %}
-{% set variant_version = "cpu" %}
-{% else %}
+{% if cuda_version %}
 {% set variant = "cuda" %}
 {% set variant_version = "cuda" + cuda_version.replace(".", "") %}
+{% else %}
+{% set variant = "cpu" %}
+{% set variant_version = "cpu" %}
 {% endif %}
 
 name: deepmd-kit
@@ -43,15 +34,13 @@ specs:
 - python {{ py_version }}.*
 {% endif %}
 - lammps{% if lammps_version %} {{ lammps_version }}{% endif %}
-
 - horovod * {{ variant }}*
 - mpi4py
 - dpdata
 - conda
-{% if cuda_version != '' %}
+{% if cuda_version %}
 - cuda-version {{ cuda_version }}
 - njzjz/noarch::libdevice-hack-for-tensorflow
-# cuda aware MPI
 - openmpi
 {% endif %}
 - libblas * *mkl
@@ -62,18 +51,14 @@ specs:
 - pytorch {{ torch_version }}
 {% endif %}
 {% if with_jax %}
-# jax
 - jax
 - jaxlib * {{ variant }}*
-- flax {{ flax_version }}
+- flax >=0.10.0
 - orbax-checkpoint
 {% endif %}
 
 ignore_duplicate_files: True
-
 license_file: ../LICENSE
-
 company: DeepModeling
-
 pre_install: pre_install.sh
 post_install: post_install.sh
