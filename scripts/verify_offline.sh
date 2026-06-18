@@ -140,8 +140,8 @@ else
 import os, numpy as np
 n_frames, n_atoms = 10, 6; rng = np.random.default_rng(42)
 types = np.array([0,0,1,0,0,1], dtype=np.int32)
-np.savetxt("$E2E_DIR/set.000/type.raw", types, fmt="%d")
-with open("$E2E_DIR/set.000/type_map.raw","w") as f: f.write("H\nO\n")
+np.savetxt("$E2E_DIR/type.raw", types, fmt="%d")
+with open("$E2E_DIR/type_map.raw","w") as f: f.write("H\nO\n")
 box=np.tile(np.diag([12.0]*3),(n_frames,1))
 np.save("$E2E_DIR/set.000/box.npy", box)
 np.save("$E2E_DIR/set.000/coord.npy", rng.uniform(0,12,(n_frames,18)))

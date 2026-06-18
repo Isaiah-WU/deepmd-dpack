@@ -1,17 +1,31 @@
 {
   "model": {
-    "type_map": ["H", "O"],
+    "type_map": [
+      "H",
+      "O"
+    ],
     "descriptor": {
       "type": "se_e2_a",
-      "sel": [10, 10],
+      "sel": [
+        10,
+        10
+      ],
       "rcut": 4.0,
       "rcut_smth": 0.5,
-      "neuron": [2, 4, 8],
+      "neuron": [
+        2,
+        4,
+        8
+      ],
       "axis_neuron": 4,
       "seed": 1
     },
     "fitting_net": {
-      "neuron": [4, 8, 4],
+      "neuron": [
+        4,
+        8,
+        4
+      ],
       "seed": 1
     }
   },
@@ -28,7 +42,9 @@
     "limit_pref_f": 1
   },
   "training": {
-    "systems": ["set.000"],
+    "systems": [
+      "."
+    ],
     "set_prefix": "set",
     "numb_steps": 10,
     "batch_size": 1,
