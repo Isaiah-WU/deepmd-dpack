@@ -123,15 +123,18 @@ bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1
 
 ### 已验证的组合
 
-以下组合已在 Bohrium 平台通过端到端验证（离线安装 → dp train → dp freeze → lammps 推理）：
+以下组合已在 Bohrium 平台通过端到端离线验证（`unshare -rn` 切网 → 安装 → `dp train` → `dp freeze` → `lammps` 推理）：
 
-| deepmd-kit 版本 | CPU/GPU | 后端 | 备注 |
-|---|---|---|---|
-| 3.1.3 | CPU | TF + JAX | ✅ 通过 |
-| 3.2.0b0 | CPU | TF + JAX + PyTorch | ✅ 通过，dpa4 真实数据 |
-| 3.2.0b0 | GPU (cuda129) | TF + JAX + PyTorch | ✅ 通过，4×V100 加速 10× |
+| deepmd-kit | CPU/GPU | 后端 | 训练数据 | 训练时间 | LAMMPS | 状态 |
+|---|---|---|---|---|---|---|
+| 3.1.3 | CPU | TF + JAX | 合成 6 原子 | 3.85s | 123ms | ✅ |
+| 3.2.0b0 | CPU | TF + JAX + PyTorch | **dpa4 真实 192 原子** | — | — | ✅ |
+| 3.2.0b0 | GPU | TF + JAX + PyTorch | 合成 6 原子 | 2.65s | 12ms | ✅ |
+| 3.2.0b0 | GPU | TF + JAX + PyTorch | dpa4 真实 192 原子 | — | — | ✅ |
 
-> **关于多 CUDA 版本**：`--cuda` 参数支持任意值。GPU 包建议使用 CUDA 12.9，该版本通过 NVIDIA minor-version compatibility 可兼容多数 12.x 驱动。
+> GPU 节点：4× Tesla V100-SXM2-16GB，CUDA 12.9。LAMMPS 推理 GPU 比 CPU 快 **10 倍**。
+>
+> `--cuda` 参数支持任意值，默认 CUDA 12.9，通过 NVIDIA minor-version compatibility 兼容多数 12.x 驱动。
 
 ### 完整参数列表
 
@@ -324,15 +327,18 @@ bash scripts/verify_offline.sh dist/*.sh <expected_version>
 
 ### Verified Combinations
 
-All verified end-to-end on Bohrium (offline install → dp train → dp freeze → lammps inference):
+All end-to-end verified on Bohrium (`unshare -rn` isolation → install → `dp train` → `dp freeze` → `lammps` inference):
 
-| deepmd-kit version | CPU/GPU | Backends | Notes |
-|---|---|---|---|
-| 3.1.3 | CPU | TF + JAX | ✅ Passed |
-| 3.2.0b0 | CPU | TF + JAX + PyTorch | ✅ Passed, dpa4 smoke test |
-| 3.2.0b0 | GPU (cuda129) | TF + JAX + PyTorch | ✅ Passed, 4×V100, 10× speedup |
+| deepmd-kit | CPU/GPU | Backends | Training Data | Train Time | LAMMPS | Status |
+|---|---|---|---|---|---|---|
+| 3.1.3 | CPU | TF + JAX | Synthetic 6-atom | 3.85s | 123ms | ✅ |
+| 3.2.0b0 | CPU | TF + JAX + PyTorch | **dpa4 real 192-atom** | — | — | ✅ |
+| 3.2.0b0 | GPU | TF + JAX + PyTorch | Synthetic 6-atom | 2.65s | 12ms | ✅ |
+| 3.2.0b0 | GPU | TF + JAX + PyTorch | dpa4 real 192-atom | — | — | ✅ |
 
-> **Multi-CUDA support**: `--cuda` accepts any value. GPU builds default to CUDA 12.9, which is compatible with most 12.x drivers through NVIDIA minor-version compatibility.
+> GPU node: 4× Tesla V100-SXM2-16GB, CUDA 12.9. LAMMPS inference: GPU 10× faster than CPU.
+>
+> `--cuda` accepts any value. Default CUDA 12.9 is compatible with most 12.x drivers via NVIDIA minor-version compatibility.
 
 ### Full Parameter Reference
 
