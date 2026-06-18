@@ -14,18 +14,17 @@
 
 科学计算集群通常断开互联网。传统的安装方式（`conda install` / `pip install`）在断网环境不可用。这个 skill 把 deepmd-kit + LAMMPS + TensorFlow/JAX/PyTorch + MPI + 全部数百个依赖打包成一个自包含文件，通过 U 盘、内网等任意方式搬运即可。
 
-### 整体架构
+### 工作流程
 
-```mermaid
-flowchart TD
-    A["🔧 build.sh<br/>接收参数<br/>───<br/>版本 · CPU/GPU · 后端 · 硬件"] --> B["📋 construct.yaml<br/>购物清单"]
-    A --> C["📦 constructor<br/>下载 + 打包"]
-    A --> D["📂 example 数据<br/>下载（可选）"]
-    B --> C
-    C --> E["💾 dist/<br/>├── xxx.sh (1.4~3 GB)<br/>└── manifest (sha256)"]
-    D --> E
-    E -->|"搬运到断网机器"| F["✅ verify_offline.sh<br/>───<br/>① 切网<br/>② 安装<br/>③ 冒烟测试<br/>④ dp train<br/>⑤ dp freeze<br/>⑥ lammps 推理<br/>───<br/>exit 0 = 通过"]
-```
+| 阶段 | 在哪做 | 做什么 | 产出 |
+|------|--------|--------|------|
+| **① 配置** | 你的电脑 | 告诉 build.sh 要什么：版本号、CPU/GPU、后端、硬件 | 一组参数 |
+| **② 下载 & 打包** | 联网 Linux 机器 | constructor 按 construct.yaml 从 conda-forge 下载所有包，打包成一个文件 | `xxx.sh`（1.4~3 GB） |
+| **③ 搬运** | 任意方式 | U 盘 / 内网 / scp 传到断网服务器 | — |
+| **④ 安装** | 断网服务器 | `bash xxx.sh -b -p /opt/deepmd` | 完整的 deepmd-kit 环境 |
+| **⑤ 验收** | 断网服务器 | `verify_offline.sh` 切网 → 安装 → dp train → freeze → lammps | ✅ 或 ❌ |
+
+> 💡 **一句话**：联网机器上 `build.sh` 打包 → 搬到断网机器 → `verify_offline.sh` 验收。
 
 ### 仓库结构
 
@@ -162,21 +161,21 @@ bash scripts/build.sh --from-commit-channel ./local-channel
 
 > 注：v3.2.0b0 已有 conda 包，用 Mode A 即可跑 dpa4。Mode B 仅在需要真正未发布的 commit 时使用。
 
-### 验证流程
+### 验收流程
 
-```mermaid
-flowchart TD
-    A["📥 输入：.sh 安装包 + 版本号"] --> B["🔌 ① 网络隔离<br/>unshare -rn"]
-    B --> C["📦 ② 离线安装<br/>安装到临时目录"]
-    C --> D["✅ ③ 冒烟测试<br/>dp -h · lmp -h · import deepmd · 版本号<br/>GPU: nvidia-smi · GPU visible · XLA"]
-    D --> E{"有 bundled example?"}
-    E -->|"是"| F["🧪 ④ 真实训练<br/>192 原子水分子<br/>× 200 帧 DFT 数据"]
-    E -->|"否"| G["🧪 ④ 合成训练<br/>6 原子 × 10 帧<br/>随机生成"]
-    F --> H["❄️ ⑤ dp freeze<br/>冻结 → .pb 模型"]
-    G --> H
-    H --> I["🚀 ⑥ lammps 推理<br/>加载模型 → MD 模拟"]
-    I --> J["🎉 VERIFY PASSED<br/>exit 0"]
-```
+验证脚本执行 6 个步骤，任一失败即退出：
+
+| 步骤 | 操作 | 说明 |
+|------|------|------|
+| ① | 切网 | `unshare -rn` 断开网络 |
+| ② | 安装 | `.sh` 安装到临时目录 |
+| ③ | 冒烟 | `dp -h` `lmp -h` `import deepmd` 版本号校验 |
+| ③-GPU | GPU 检测 | `nvidia-smi` · TF/JAX GPU · XLA libdevice |
+| ④ | 训练 | 有 example → 192 原子真实 DFT 数据；无 → 6 原子合成数据 |
+| ⑤ | 冻结 | `dp freeze` 生成可部署模型 |
+| ⑥ | 推理 | `lmp` 加载模型跑 MD |
+
+全部通过输出 `VERIFY PASSED` 并 `exit 0`。
 
 ### 安装后的能力
 
@@ -213,18 +212,17 @@ A [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills) tha
 
 HPC clusters are typically disconnected from the internet. Standard `conda install` / `pip install` workflows do not work. This skill packages deepmd-kit + LAMMPS + TensorFlow/JAX/PyTorch + MPI + hundreds of dependencies into a single self-extracting archive, transferable via USB, internal network, or any other means.
 
-### Architecture
+### How It Works
 
-```mermaid
-flowchart TD
-    A["🔧 build.sh<br/>Receives params<br/>───<br/>version · CPU/GPU · backend · hardware"] --> B["📋 construct.yaml<br/>Bill of materials"]
-    A --> C["📦 constructor<br/>Fetch + package"]
-    A --> D["📂 Example data<br/>fetch (optional)"]
-    B --> C
-    C --> E["💾 dist/<br/>├── xxx.sh (1.4–3 GB)<br/>└── manifest (sha256)"]
-    D --> E
-    E -->|"Ship to air-gapped node"| F["✅ verify_offline.sh<br/>───<br/>① Isolate network<br/>② Install<br/>③ Smoke tests<br/>④ dp train<br/>⑤ dp freeze<br/>⑥ LAMMPS inference<br/>───<br/>exit 0 = passed"]
-```
+| Phase | Where | What | Output |
+|-------|-------|------|--------|
+| **① Config** | Your machine | Tell `build.sh` what you want: version, CPU/GPU, backend, hardware | A set of flags |
+| **② Fetch & Pack** | Internet-connected Linux | `constructor` reads `construct.yaml`, downloads everything from conda-forge, packages into one file | `xxx.sh` (1.4–3 GB) |
+| **③ Transfer** | Any method | USB / LAN / scp to air-gapped server | — |
+| **④ Install** | Air-gapped server | `bash xxx.sh -b -p /opt/deepmd` | Full deepmd-kit environment |
+| **⑤ Verify** | Air-gapped server | `verify_offline.sh` isolates network → install → dp train → freeze → LAMMPS MD | ✅ or ❌ |
+
+> 💡 **TL;DR**: `build.sh` on networked machine → transfer → `verify_offline.sh` on air-gapped machine.
 
 ### Repository Layout
 
@@ -350,21 +348,21 @@ bash scripts/build.sh --from-commit-channel ./local-channel
 
 > Note: v3.2.0b0 already has a conda package — use Mode A for dpa4. Mode B is only needed for genuinely unreleased commits.
 
-### Verification Flow
+### Acceptance Test
 
-```mermaid
-flowchart TD
-    A["📥 Input: .sh installer + version"] --> B["🔌 ① Network isolation<br/>unshare -rn"]
-    B --> C["📦 ② Offline install<br/>Install to temp prefix"]
-    C --> D["✅ ③ Smoke tests<br/>dp -h · lmp -h · import deepmd · version<br/>GPU: nvidia-smi · GPU visible · XLA"]
-    D --> E{"Bundled example?"}
-    E -->|"Yes"| F["🧪 ④ Real training<br/>192 atoms × 200 frames<br/>DFT data"]
-    E -->|"No"| G["🧪 ④ Synthetic training<br/>6 atoms × 10 frames<br/>random data"]
-    F --> H["❄️ ⑤ dp freeze<br/>Freeze → .pb model"]
-    G --> H
-    H --> I["🚀 ⑥ LAMMPS inference<br/>Load model → MD simulation"]
-    I --> J["🎉 VERIFY PASSED<br/>exit 0"]
-```
+The verification script runs 6 gates. Any failure exits immediately:
+
+| Step | Action | Detail |
+|------|--------|--------|
+| ① | Isolate | `unshare -rn` cuts network |
+| ② | Install | `.sh` to temp prefix |
+| ③ | Smoke | `dp -h` `lmp -h` `import deepmd` version check |
+| ③-GPU | GPU check | `nvidia-smi` · TF/JAX GPU · XLA libdevice |
+| ④ | Train | Bundled example → 192-atom DFT data; no example → 6-atom synthetic |
+| ⑤ | Freeze | `dp freeze` → deployable model |
+| ⑥ | Inference | `lmp` loads frozen model, runs MD |
+
+All pass → `VERIFY PASSED`, exit 0.
 
 ### Post-Install Capabilities
 
