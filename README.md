@@ -16,48 +16,15 @@
 
 ### 整体架构
 
-```
-                          ┌──────────────────────┐
-                          │  build.sh  接收参数   │
-                          │  ─────────────────── │
-                          │  • 版本号 (--version) │
-                          │  • CPU/GPU (--cuda)   │
-                          │  • 后端 (--backend)   │
-                          │  • 硬件 (--glibc)     │
-                          └──────────┬───────────┘
-                                     │
-                    ┌────────────────┼────────────────┐
-                    ▼                ▼                ▼
-          ┌─────────────┐  ┌──────────────┐  ┌──────────────┐
-          │ construct.  │  │  constructor  │  │   example    │
-          │   yaml      │  │  下载+打包    │  │   数据下载    │
-          │ (购物清单)   │  │              │  │  (可选)      │
-          └──────┬──────┘  └──────┬───────┘  └──────┬───────┘
-                 │                │                  │
-                 └────────┬───────┘                  │
-                          ▼                          │
-                ┌──────────────────┐                 │
-                │  dist/           │◄────────────────┘
-                │  ├── xxx.sh      │  1.4~3 GB
-                │  └── manifest    │  sha256 校验
-                └────────┬─────────┘
-                         │
-            ═════════════╪═══════════════  搬运到断网机器
-                         │
-                         ▼
-                ┌──────────────────┐
-                │  verify_offline  │
-                │  .sh             │
-                │  ─────────────── │
-                │  ① 切网          │
-                │  ② 安装到临时目录 │
-                │  ③ 冒烟测试      │
-                │  ④ dp train      │
-                │  ⑤ dp freeze     │
-                │  ⑥ lammps 推理   │
-                │                  │
-                │  exit 0 = ✅     │
-                └──────────────────┘
+```mermaid
+flowchart TD
+    A["🔧 build.sh<br/>接收参数<br/>───<br/>版本 · CPU/GPU · 后端 · 硬件"] --> B["📋 construct.yaml<br/>购物清单"]
+    A --> C["📦 constructor<br/>下载 + 打包"]
+    A --> D["📂 example 数据<br/>下载（可选）"]
+    B --> C
+    C --> E["💾 dist/<br/>├── xxx.sh (1.4~3 GB)<br/>└── manifest (sha256)"]
+    D --> E
+    E -->|"搬运到断网机器"| F["✅ verify_offline.sh<br/>───<br/>① 切网<br/>② 安装<br/>③ 冒烟测试<br/>④ dp train<br/>⑤ dp freeze<br/>⑥ lammps 推理<br/>───<br/>exit 0 = 通过"]
 ```
 
 ### 仓库结构
@@ -197,53 +164,18 @@ bash scripts/build.sh --from-commit-channel ./local-channel
 
 ### 验证流程
 
-```
-    输入: .sh 安装包 + 期望版本号
-    ═══════════════════════════════════
-
-    ┌──────────────────────────────────────────┐
-    │              ① 网络隔离                   │
-    │     unshare -rn  /  docker --network none │
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │              ② 离线安装                   │
-    │     bash xxx.sh -b -p /tmp/dpenv         │
-    │     source /tmp/dpenv/bin/activate        │
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │              ③ 冒烟测试                   │
-    │  ✅ dp -h      ✅ lmp -h                  │
-    │  ✅ import deepmd    ✅ 版本号校验          │
-    │  [GPU] ✅ nvidia-smi ✅ TF/JAX GPU visible│
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │           ④ dp train 训练                 │
-    │  ┌─ 有 bundled example ─────────────────┐ │
-    │  │  192 原子水分子 × 200 帧真实 DFT 数据   │ │
-    │  └──────────────────────────────────────┘ │
-    │  ┌─ 无 example ─────────────────────────┐ │
-    │  │  6 原子 × 10 帧合成数据               │ │
-    │  └──────────────────────────────────────┘ │
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │           ⑤ dp freeze                    │
-    │     冻结 → 可部署的 .pb 模型文件           │
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │         ⑥ lammps 推理                    │
-    │     lmp -in in.lammps                    │
-    │     加载冻结模型 → MD 模拟 3 步            │
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │          VERIFY PASSED  ✅               │
-    │     exit 0 = 全部通关                     │
-    └──────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["📥 输入：.sh 安装包 + 版本号"] --> B["🔌 ① 网络隔离<br/>unshare -rn"]
+    B --> C["📦 ② 离线安装<br/>安装到临时目录"]
+    C --> D["✅ ③ 冒烟测试<br/>dp -h · lmp -h · import deepmd · 版本号<br/>GPU: nvidia-smi · GPU visible · XLA"]
+    D --> E{"有 bundled example?"}
+    E -->|"是"| F["🧪 ④ 真实训练<br/>192 原子水分子<br/>× 200 帧 DFT 数据"]
+    E -->|"否"| G["🧪 ④ 合成训练<br/>6 原子 × 10 帧<br/>随机生成"]
+    F --> H["❄️ ⑤ dp freeze<br/>冻结 → .pb 模型"]
+    G --> H
+    H --> I["🚀 ⑥ lammps 推理<br/>加载模型 → MD 模拟"]
+    I --> J["🎉 VERIFY PASSED<br/>exit 0"]
 ```
 
 ### 安装后的能力
@@ -283,49 +215,15 @@ HPC clusters are typically disconnected from the internet. Standard `conda insta
 
 ### Architecture
 
-```
-                          ┌──────────────────────┐
-                          │     build.sh          │
-                          │  ───────────────────  │
-                          │  • version (--version)│
-                          │  • CPU/GPU (--cuda)   │
-                          │  • backend (--backend)│
-                          │  • target (--glibc)   │
-                          └──────────┬───────────┘
-                                     │
-                    ┌────────────────┼────────────────┐
-                    ▼                ▼                ▼
-          ┌─────────────┐  ┌──────────────┐  ┌──────────────┐
-          │ construct.  │  │  constructor  │  │   example    │
-          │   yaml      │  │  fetch+pack   │  │   data fetch │
-          │ (bill of    │  │              │  │  (optional)  │
-          │  materials) │  │              │  │              │
-          └──────┬──────┘  └──────┬───────┘  └──────┬───────┘
-                 │                │                  │
-                 └────────┬───────┘                  │
-                          ▼                          │
-                ┌──────────────────┐                 │
-                │  dist/           │◄────────────────┘
-                │  ├── xxx.sh      │  1.4–3 GB
-                │  └── manifest    │  w/ sha256
-                └────────┬─────────┘
-                         │
-            ═════════════╪═══════════════  ship to air-gapped machine
-                         │
-                         ▼
-                ┌──────────────────┐
-                │  verify_offline  │
-                │  .sh             │
-                │  ─────────────── │
-                │  ① isolate net   │
-                │  ② install       │
-                │  ③ smoke tests   │
-                │  ④ dp train      │
-                │  ⑤ dp freeze     │
-                │  ⑥ lammps MD     │
-                │                  │
-                │  exit 0 = pass   │
-                └──────────────────┘
+```mermaid
+flowchart TD
+    A["🔧 build.sh<br/>Receives params<br/>───<br/>version · CPU/GPU · backend · hardware"] --> B["📋 construct.yaml<br/>Bill of materials"]
+    A --> C["📦 constructor<br/>Fetch + package"]
+    A --> D["📂 Example data<br/>fetch (optional)"]
+    B --> C
+    C --> E["💾 dist/<br/>├── xxx.sh (1.4–3 GB)<br/>└── manifest (sha256)"]
+    D --> E
+    E -->|"Ship to air-gapped node"| F["✅ verify_offline.sh<br/>───<br/>① Isolate network<br/>② Install<br/>③ Smoke tests<br/>④ dp train<br/>⑤ dp freeze<br/>⑥ LAMMPS inference<br/>───<br/>exit 0 = passed"]
 ```
 
 ### Repository Layout
@@ -454,48 +352,18 @@ bash scripts/build.sh --from-commit-channel ./local-channel
 
 ### Verification Flow
 
-```
-    Input: .sh installer + expected version
-    ═══════════════════════════════════════
-
-    ┌──────────────────────────────────────────┐
-    │           ① Network Isolation            │
-    │     unshare -rn  /  docker --network none │
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │           ② Offline Install              │
-    │     bash xxx.sh -b -p /tmp/dpenv         │
-    │     source /tmp/dpenv/bin/activate        │
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │           ③ Smoke Tests                  │
-    │  ✅ dp -h      ✅ lmp -h                  │
-    │  ✅ import deepmd    ✅ version check      │
-    │  [GPU] ✅ nvidia-smi ✅ GPU visible        │
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │         ④ dp train + freeze              │
-    │  ┌─ Bundled example ────────────────────┐│
-    │  │  192 atoms × 200 frames (real DFT)    ││
-    │  └──────────────────────────────────────┘│
-    │  ┌─ No example ─────────────────────────┐│
-    │  │  6 atoms × 10 frames (synthetic)      ││
-    │  └──────────────────────────────────────┘│
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │         ⑤ LAMMPS Inference               │
-    │     lmp -in in.lammps                    │
-    │     load frozen model → MD 3 steps        │
-    └──────────────────┬───────────────────────┘
-                       ▼
-    ┌──────────────────────────────────────────┐
-    │          VERIFY PASSED  ✅               │
-    │     exit 0 = all gates passed             │
-    └──────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["📥 Input: .sh installer + version"] --> B["🔌 ① Network isolation<br/>unshare -rn"]
+    B --> C["📦 ② Offline install<br/>Install to temp prefix"]
+    C --> D["✅ ③ Smoke tests<br/>dp -h · lmp -h · import deepmd · version<br/>GPU: nvidia-smi · GPU visible · XLA"]
+    D --> E{"Bundled example?"}
+    E -->|"Yes"| F["🧪 ④ Real training<br/>192 atoms × 200 frames<br/>DFT data"]
+    E -->|"No"| G["🧪 ④ Synthetic training<br/>6 atoms × 10 frames<br/>random data"]
+    F --> H["❄️ ⑤ dp freeze<br/>Freeze → .pb model"]
+    G --> H
+    H --> I["🚀 ⑥ LAMMPS inference<br/>Load model → MD simulation"]
+    I --> J["🎉 VERIFY PASSED<br/>exit 0"]
 ```
 
 ### Post-Install Capabilities
