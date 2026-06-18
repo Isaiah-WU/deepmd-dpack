@@ -45,7 +45,7 @@ trap 'rm -rf "$WORK"' EXIT
 # If there's a bundled real example, copy it into the workspace so the isolated
 # test can read it (unshare inherits the filesystem; docker needs a bind mount).
 if [[ -n "$BUNDLED_EXAMPLE" ]]; then
-  cp -r "$BUNDLED_EXAMPLE" "$EXAMPLE_DIR"
+  cp -r "$BUNDLED_EXAMPLE"/. "$EXAMPLE_DIR"
   echo "==> Bundled example: $BUNDLED_EXAMPLE"
 fi
 
