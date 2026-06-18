@@ -34,6 +34,8 @@ if [[ -n "${VERIFY_GPU:-}" ]]; then GPU_MODE="$VERIFY_GPU"
 elif [[ "$(basename "$INSTALLER")" == *cuda* ]]; then GPU_MODE=1
 else GPU_MODE=0; fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 WORK="$(mktemp -d)"
 PREFIX="$WORK/dpenv"
 EXAMPLE_DIR="$WORK/example"
@@ -146,9 +148,7 @@ np.save("$E2E_DIR/set.000/coord.npy", rng.uniform(0,12,(n_frames,18)))
 np.save("$E2E_DIR/set.000/energy.npy", rng.uniform(-10,-9,n_frames))
 np.save("$E2E_DIR/set.000/force.npy", rng.uniform(-0.1,0.1,(n_frames,18)))
 PY
-  cat > "\$E2E_DIR/input.json" <<'JSON'
-{"model":{"type_map":["H","O"],"descriptor":{"type":"se_e2_a","sel":[10,10],"rcut":4.0,"rcut_smth":0.5,"neuron":[2,4,8],"axis_neuron":4,"seed":1},"fitting_net":{"neuron":[4,8,4],"seed":1}},"training":{"training_data":{"systems":["set.000"],"batch_size":1},"numb_steps":10,"seed":1,"disp_file":"lcurve.out","disp_freq":1,"save_freq":10}}
-JSON
+  cp "$SKILL_ROOT/examples/verify-input.json" "\$E2E_DIR/input.json"
   echo "==> E2E: dp train (synthetic)"; ( cd "\$E2E_DIR" && dp train input.json )
   echo "==> E2E: dp freeze"; ( cd "\$E2E_DIR" && dp freeze -o frozen_model.pb )
   cat > "\$E2E_DIR/data.lmp" <<LMP
