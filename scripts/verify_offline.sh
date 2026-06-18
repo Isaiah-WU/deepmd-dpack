@@ -151,13 +151,40 @@ PY
   cp "$SKILL_ROOT/examples/verify-input.json" "\$E2E_DIR/input.json"
   echo "==> E2E: dp train (synthetic)"; ( cd "\$E2E_DIR" && dp train input.json )
   echo "==> E2E: dp freeze"; ( cd "\$E2E_DIR" && dp freeze -o frozen_model.pb )
-  cat > "\$E2E_DIR/data.lmp" <<LMP
-LAMMPS data file; 6 atoms; 2 atom types; 0.0 12.0 xlo xhi; 0.0 12.0 ylo yhi; 0.0 12.0 zlo zhi
-Masses; 1 1.008; 2 15.999
-Atoms; 1 1 6.0 6.0 6.0; 2 1 6.5 7.0 6.0; 3 2 8.0 6.0 6.0; 4 1 4.0 6.0 6.0; 5 1 3.5 7.0 6.0; 6 2 5.0 6.0 6.0
+  cat > "\$E2E_DIR/data.lmp" <<'LMP'
+LAMMPS data file
+
+6 atoms
+2 atom types
+0.0 12.0 xlo xhi
+0.0 12.0 ylo yhi
+0.0 12.0 zlo zhi
+
+Masses
+
+1 1.008
+2 15.999
+
+Atoms
+
+1 1 6.0 6.0 6.0
+2 1 6.5 7.0 6.0
+3 2 8.0 6.0 6.0
+4 1 4.0 6.0 6.0
+5 1 3.5 7.0 6.0
+6 2 5.0 6.0 6.0
 LMP
   cat > "\$E2E_DIR/in.lammps" <<'LMP'
-units metal; atom_style atomic; boundary p p p; read_data data.lmp; pair_style deepmd frozen_model.pb; pair_coeff * *; thermo 1; thermo_style custom step pe ke temp; timestep 0.0005; run 3
+units metal
+atom_style atomic
+boundary p p p
+read_data data.lmp
+pair_style deepmd frozen_model.pb
+pair_coeff * *
+thermo 1
+thermo_style custom step pe ke temp
+timestep 0.0005
+run 3
 LMP
   echo "==> E2E: lammps inference (synthetic)"; ( cd "\$E2E_DIR" && lmp -in in.lammps )
 fi
