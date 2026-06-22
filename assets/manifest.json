@@ -1,0 +1,48 @@
+{
+  "repository": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill",
+  "manifest_url": "https://raw.githubusercontent.com/Isaiah-WU/deepmd-offline-installer-skill/main/assets/manifest.json",
+  "tools": {
+    "dp": {
+      "name": "DeePMD-kit",
+      "description": "Deep Potential Molecular Dynamics — neural network interatomic potential",
+      "homepage": "https://github.com/deepmodeling/deepmd-kit",
+      "variants": {
+        "cuda126": {
+          "type": "gpu",
+          "cuda": "12.6",
+          "backend": "tf+jax+torch",
+          "url": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda126-Linux-x86_64.sh",
+          "sha256": ""
+        },
+        "cuda128": {
+          "type": "gpu",
+          "cuda": "12.8",
+          "backend": "tf+jax+torch",
+          "url": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda128-Linux-x86_64.sh",
+          "sha256": ""
+        },
+        "cuda129": {
+          "type": "gpu",
+          "cuda": "12.9",
+          "backend": "tf+jax+torch",
+          "url": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh",
+          "sha256": "80714c85e5efcba439769a7e214dc5c44599968a2ba30a8b0048ffc8836590cb"
+        },
+        "cuda131": {
+          "type": "gpu",
+          "cuda": "13.1",
+          "backend": "tf+jax+torch",
+          "url": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda131-Linux-x86_64.sh",
+          "sha256": ""
+        },
+        "cpu": {
+          "type": "cpu",
+          "cuda": null,
+          "backend": "tf+jax+torch",
+          "url": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cpu-Linux-x86_64.sh",
+          "sha256": ""
+        }
+      }
+    }
+  }
+}

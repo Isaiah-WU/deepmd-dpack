@@ -63,6 +63,29 @@ deepmd-offline-installer-skill/
    └─    notes.md          排查手册 & GPU / commit 流程
 ```
 
+### 一键安装（推荐）
+
+```bash
+# 1. 装 dpack
+curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-offline-installer-skill/main/dpack -o /usr/local/bin/dpack
+chmod +x /usr/local/bin/dpack
+
+# 2. 一行装 DeePMD-kit（自动检测 GPU 和 CUDA 版本）
+dpack install dp
+
+# 或指定 CUDA 版本
+dpack install dp --cuda 12.8
+
+# 查看已装工具
+dpack list
+```
+
+> dpack 是 DeepModeling 社区的轻量包管理器。以后 `dpack install dpgen`、`dpack install <采样>`、`dpack upgrade dp` 逐步支持。对标 PyTorch 的一行安装 + pixi 的体验。
+
+### 构建自己的离线包
+
+如果你需要自建离线包（而非用 dpack 下载预编译的），见下方「构建」章节。
+
 ### 前置要求
 
 | 条件 | 说明 |
@@ -296,6 +319,29 @@ deepmd-offline-installer-skill/
 └─ 📁 references/
    └─    notes.md        Deep-dive & troubleshooting
 ```
+
+### One-Line Install (Recommended)
+
+```bash
+# 1. Install dpack
+curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-offline-installer-skill/main/dpack -o /usr/local/bin/dpack
+chmod +x /usr/local/bin/dpack
+
+# 2. One command to install DeePMD-kit (auto-detects GPU and CUDA)
+dpack install dp
+
+# Or specify CUDA version
+dpack install dp --cuda 12.8
+
+# List installed tools
+dpack list
+```
+
+> dpack is a lightweight package manager for the DeepModeling ecosystem. Future support: `dpack install dpgen`, `dpack upgrade dp`, etc. Pixi-like UX, PyTorch-like one-line install.
+
+### Build Your Own Offline Packages
+
+If you need to build offline installers yourself (instead of using dpack's pre-built releases), see the Build section below.
 
 ### Prerequisites
 

@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# dpack — DeepModeling package manager
+# One command to install any DeepModeling tool: dp, dpgen, ...
+#
+# Usage:
+#   dpack install dp                  # auto-detect CUDA, latest version
+#   dpack install dp --cuda 12.8      # explicit CUDA version
+#   dpack install dp --backend pytorch # explicit backend
+#   dpack install dp --cuda 12.8 --version 3.2.0b0
+#   dpack list                         # show installed tools
+#   dpack help                         # show this message
+#
+# Design: curl | bash installs dpack itself, then dpack installs tools.
+# Like pixi / brew but for the DeepModeling ecosystem.
+
+set -euo pipefail
+
+DPACK_HOME="${DPACK_HOME:-$HOME/.dpack}"
+MANIFEST_URL="${DPACK_MANIFEST_URL:-https://raw.githubusercontent.com/Isaiah-WU/deepmd-offline-installer-skill/main/assets/manifest.json}"
+INSTALLED_DB="$DPACK_HOME/installed.json"
+CACHE_DIR="$DPACK_HOME/cache"
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+bold()  { printf "\033[1m%s\033[0m" "$*"; }
+green() { printf "\033[32m%s\033[0m" "$*"; }
+red()   { printf "\033[31m%s\033[0m" "\n$*" >&2; }
+warn()  { printf "\033[33m%s\033[0m" "$*" >&2; }
+
+detect_cuda() {
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1 | cut -d. -f1,2
+  else
+    echo ""
+  fi
+}
+
+download_manifest() {
+  mkdir -p "$DPACK_HOME"
+  curl -fsSL "$MANIFEST_URL" -o "$DPACK_HOME/manifest.json" 2>/dev/null || {
+    red "Cannot reach manifest at $MANIFEST_URL"
+    exit 1
+  }
+  cat "$DPACK_HOME/manifest.json"
+}
+
+pick_variant() {
+  local manifest="$1" tool="$2" cuda="$3"
+  # Try exact CUDA match first, then fallback to cpu
+  if [[ -n "$cuda" ]]; then
+    local key="cuda${cuda//./}"
+    if echo "$manifest" | grep -q "\"$key\""; then
+      echo "$key"
+      return
+    fi
+    # Try nearest match: find the closest CUDA version ≤ requested
+    for v in 13.1 12.9 12.8 12.6 12.4 12.1; do
+      if echo "$manifest" | grep -q "\"cuda${v//./}\""; then
+        echo "cuda${v//./}"
+        return
+      fi
+    done
+  fi
+  echo "cpu"
+}
+
+cmd_install() {
+  local tool="${1:-}" cuda="" version=""
+  shift || true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --cuda)     cuda="$2"; shift 2 ;;
+      --version)  version="$2"; shift 2 ;;
+      --backend)  shift 2 ;;  # future: per-backend download
+      *)          shift ;;
+    esac
+  done
+
+  if [[ -z "$tool" ]]; then
+    red "Usage: dpack install <tool> [--cuda <ver>] [--version <ver>]"
+    exit 1
+  fi
+
+  # Auto-detect CUDA
+  if [[ -z "$cuda" ]]; then
+    cuda="$(detect_cuda)"
+    if [[ -n "$cuda" ]]; then
+      echo "  Auto-detected CUDA $(green "$cuda")"
+    else
+      echo "  No GPU detected, defaulting to CPU"
+    fi
+  fi
+
+  echo "  Downloading manifest..."
+  local manifest
+  manifest="$(download_manifest)"
+
+  # Pick best variant
+  local variant
+  variant="$(pick_variant "$manifest" "$tool" "$cuda")"
+  local url sha
+  url="$(echo "$manifest" | python3 -c "
+import json,sys
+m=json.load(sys.stdin)
+v=m['tools']['$tool']['variants']['$variant']
+print(v['url'])
+" 2>/dev/null || echo "")"
+  sha="$(echo "$manifest" | python3 -c "
+import json,sys
+m=json.load(sys.stdin)
+v=m['tools']['$tool']['variants']['$variant']
+print(v.get('sha256',''))
+" 2>/dev/null || echo "")"
+
+  if [[ -z "$url" ]]; then
+    red "No installer found for $tool ($variant). Available:"
+    echo "$manifest" | python3 -c "
+import json,sys
+m=json.load(sys.stdin)
+for k,v in m['tools']['$tool']['variants'].items():
+    print(f'    {k} (cuda={v.get(\"cuda\",\"cpu\")})')
+" 2>/dev/null || echo "    (could not parse manifest)"
+    exit 1
+  fi
+
+  echo "  Selected: $(bold "$tool") variant $(green "$variant")"
+  echo "  Downloading from $url ..."
+  mkdir -p "$CACHE_DIR"
+  local installer="$CACHE_DIR/${tool}-${variant}.sh"
+  curl -fSL --progress-bar "$url" -o "$installer" || {
+    red "Download failed. The installer may not be released yet."
+    exit 1
+  }
+
+  # Verify sha256 if available
+  if [[ -n "$sha" ]]; then
+    local got
+    got="$(sha256sum "$installer" | cut -d' ' -f1)"
+    if [[ "$got" != "$sha" ]]; then
+      red "SHA256 mismatch: expected $sha, got $got"
+      exit 1
+    fi
+    echo "  SHA256 verified"
+  fi
+
+  # Install
+  echo "  Installing $tool ..."
+  local prefix="${DPACK_PREFIX:-$HOME/deepmd-kit}"
+  bash "$installer" -b -p "$prefix"
+
+  # Record
+  mkdir -p "$DPACK_HOME"
+  echo "{\"tool\":\"$tool\",\"variant\":\"$variant\",\"cuda\":\"$cuda\",\"prefix\":\"$prefix\",\"installed_at\":\"$(date -Iseconds)\"}" > "$DPACK_HOME/installed-$tool.json"
+  echo "$tool $variant $prefix" >> "$INSTALLED_DB" 2>/dev/null || true
+
+  echo ""
+  echo "  $(green "✓") $tool installed to $(bold "$prefix")"
+  echo "  Activate: source $prefix/bin/activate $prefix"
+  echo "  Verify:   dp --version"
+}
+
+cmd_list() {
+  if [[ -f "$INSTALLED_DB" ]]; then
+    echo "Installed tools:"
+    cat "$INSTALLED_DB"
+  else
+    echo "No tools installed yet. Try: dpack install dp"
+  fi
+}
+
+cmd_help() {
+  sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# //'
+  echo ""
+  echo "Examples:"
+  echo "  dpack install dp                     # auto-detect GPU, install latest"
+  echo "  dpack install dp --cuda 12.8          # explicit CUDA"
+  echo "  dpack list                            # show installed tools"
+}
+
+# ── main ──────────────────────────────────────────────────────────────────────
+mkdir -p "$DPACK_HOME" "$CACHE_DIR"
+case "${1:-help}" in
+  install) shift; cmd_install "$@" ;;
+  list)    shift; cmd_list "$@" ;;
+  help|--help|-h) cmd_help ;;
+  *)       red "Unknown command: ${1:-}"; cmd_help; exit 1 ;;
+esac
