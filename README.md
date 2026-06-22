@@ -81,34 +81,55 @@ deepmd-offline-installer-skill/
 git clone https://github.com/Isaiah-WU/deepmd-offline-installer-skill.git
 cd deepmd-offline-installer-skill
 
-# 2. 构建 CPU 版（约 10-15 分钟）
-bash scripts/build.sh --version 3.1.3
+# 2. 基础版本号在 assets/version.txt（单一来源），构建时自动读取
+cat assets/version.txt   # → 3.2.0b0
 
-# 3. 断网验收（约 2 分钟）
-bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cpu-Linux-x86_64.sh 3.1.3
+# 3. 构建 CPU 版（约 10-15 分钟）
+bash scripts/build.sh
 
-# 4. 拿到断网机器上安装
-bash dist/deepmd-kit-3.1.3-cpu-Linux-x86_64.sh -b -p /opt/deepmd
+# 4. 产物在 dist/cpu/ 下（按 CUDA 版本分目录，对标 PyTorch /whl/{cuXXX}/）
+ls -lh dist/cpu/
+
+# 5. 断网验收
+bash scripts/verify_offline.sh dist/cpu/*.sh $(cat assets/version.txt)
+
+# 6. 拿到断网机器上安装
+bash dist/cpu/*.sh -b -p /opt/deepmd
 source /opt/deepmd/bin/activate /opt/deepmd
-dp --version    # → DeePMD-kit v3.1.3
+dp --version
 ```
+
+### 选择你的版本（对标 PyTorch get-started）
+
+第一步：`nvidia-smi` 看你的 CUDA 驱动版本，选对应的包下载。如果没 GPU，选 CPU。
+
+| 你的机器 | 下载 |
+|----------|------|
+| CPU（无 GPU） | `bash dist/cpu/*.sh -b -p /opt/deepmd` |
+| CUDA 12.6 驱动 | `bash dist/cuda126/*.sh -b -p /opt/deepmd` |
+| CUDA 12.8 驱动 | `bash dist/cuda128/*.sh -b -p /opt/deepmd` |
+| CUDA 13.1 驱动 | `bash dist/cuda131/*.sh -b -p /opt/deepmd` |
+
+第二步：选的包是一行命令安装——不需要手动装 CUDA Toolkit 或设 CUDA_HOME。
 
 ### 常用命令
 
 #### 构建不同版本
 
 ```bash
-# GPU 版（CUDA 12.9；构建机无需 GPU，验证需 GPU 节点）
-bash scripts/build.sh --version 3.1.3 --cuda 12.9
+# 产物自动按 CUDA 分目录：dist/cpu/  dist/cuda128/  dist/cuda131/
+bash scripts/build.sh --cuda 12.6
+bash scripts/build.sh --cuda 12.8
+bash scripts/build.sh --cuda 13.1
 
-# v3.2.0b0 + PyTorch（用于 dpa4 模型）
-bash scripts/build.sh --version 3.2.0b0 --backend pytorch --torch-version ">=2.5"
+# CPU 版
+bash scripts/build.sh
 
-# 指定后端 + 目标 GLIBC
-bash scripts/build.sh --version 3.1.3 --backend all --torch-version ">=2.5" --glibc 2.28
+# 指定后端（TF / PyTorch / JAX / 全都要）
+bash scripts/build.sh --backend pytorch --torch-version ">=2.5"
 
 # 打包时附带真实训练数据（验证时用真实数据跑 dp train）
-bash scripts/build.sh --version 3.1.3 --example dpa4
+bash scripts/build.sh --example dpa4
 ```
 
 #### 验证

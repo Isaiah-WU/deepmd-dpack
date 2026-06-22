@@ -43,10 +43,22 @@ SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEFAULT_RECIPE="$SKILL_ROOT/assets"
 
 # --- defaults -----------------------------------------------------------------
-VERSION="${VERSION:-3.1.3}"
+# Read base version from assets/version.txt (single source of truth)
+VERSION_FILE="$SKILL_ROOT/assets/version.txt"
+if [[ -f "$VERSION_FILE" ]]; then
+  VERSION="${VERSION:-$(head -1 "$VERSION_FILE" | tr -d '[:space:]')}"
+else
+  VERSION="${VERSION:-3.1.3}"
+fi
 CUDA_VERSION="${CUDA_VERSION:-}"
 RECIPE_DIR="$DEFAULT_RECIPE"
-OUTPUT_DIR="$(pwd)/dist"
+# Output organized by variant — like PyTorch's /whl/{cuXXX}/
+if [[ -n "$CUDA_VERSION" ]]; then
+  OUT_SUBDIR="cuda${CUDA_VERSION//./}"
+else
+  OUT_SUBDIR="cpu"
+fi
+OUTPUT_DIR="$(pwd)/dist/${OUT_SUBDIR}"
 COMMIT_CHANNEL=""
 SPLIT_PARTS=""
 DEEPMD_BUILD="${DEEPMD_BUILD:-}"
