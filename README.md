@@ -8,59 +8,80 @@
 
 ### 这是什么
 
-一个 [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills)，用于**在一台联网 Linux 机器上**构建 DeePMD-kit 的离线安装包（自解压 `.sh` 文件），然后将该安装包拿到**任意断网机器上**一键安装，安装后即可运行 `dp train`（训练势函数）和 `lmp`（LAMMPS 分子动力学推理）。
+DeepModeling 社区的分发体系项目——**对标 PyTorch 的自动化构建 + 离线安装 + 包管理器**。
+
+```
+用户视角                             后台
+────────                             ────
+有网机器：                              GitHub Actions nightly CI
+  dpack install dp                     每天自动构建 CPU + 4 个 CUDA 版本
+  dpack install dp --cuda 12.8         产物 → GitHub Release / Artifacts
+                                       manifest.json 自动更新
+断网机器：                              
+  下载 .sh → bash xxx.sh               conda-forge PR（等晋哲 merge）：
+  一行安装，不需要 CUDA Toolkit         多 CUDA 包自动发布
+```
+
+包含四个组件：
+
+| 组件 | 文件 | 对标 |
+|------|------|------|
+| **自动化 nightly 构建** | `.github/workflows/nightly.yml` | PyTorch trunk CI |
+| **包管理器** | `dpack` | pixi / brew |
+| **离线安装包构建** | `scripts/build.sh` + `assets/construct.yaml` | conda constructor |
+| **断网验收** | `scripts/verify_offline.sh` | 冒烟测试 → dp train + lammps |
 
 ### 解决的问题
 
-科学计算集群通常断开互联网。传统的安装方式（`conda install` / `pip install`）在断网环境不可用。这个 skill 把 deepmd-kit + LAMMPS + TensorFlow/JAX/PyTorch + MPI + 全部数百个依赖打包成一个自包含文件，通过 U 盘、内网等任意方式搬运即可。
+科学计算集群通常断网，`conda install` / `pip install` 不可用。这个项目把 deepmd-kit + LAMMPS + TF/JAX/PyTorch + MPI + 全部依赖打包成自包含文件，通过 U 盘搬运即可。以后逐步加入 dpgen、采样、蒸馏等 DeepModeling 工具——一个 `dpack` 装所有。
 
 ### 工作流程
 
 | 阶段 | 在哪做 | 做什么 | 产出 |
 |------|--------|--------|------|
-| **① 配置** | 你的电脑 | 告诉 build.sh 要什么：版本号、CPU/GPU、后端、硬件 | 一组参数 |
-| **② 下载 & 打包** | 联网 Linux 机器 | constructor 按 construct.yaml 从 conda-forge 下载所有包，打包成一个文件 | `xxx.sh`（1.4~3 GB） |
-| **③ 搬运** | 任意方式 | U 盘 / 内网 / scp 传到断网服务器 | — |
-| **④ 安装** | 断网服务器 | `bash xxx.sh -b -p /opt/deepmd` | 完整的 deepmd-kit 环境 |
-| **⑤ 验收** | 断网服务器 | `verify_offline.sh` 切网 → 安装 → dp train → freeze → lammps | ✅ 或 ❌ |
+| **① 自动化** | GitHub Actions | nightly CI 每天构建多 CUDA 版本 | 上传 Release |
+| **② 安装** | 用户机器 | `dpack install dp` 或 `bash xxx.sh` | deepmd-kit 环境 |
+| **③ 验收** | 任意机器 | `verify_offline.sh` 切网 → 安装 → dp train → lammps | ✅ 或 ❌ |
 
-> 💡 **一句话**：联网机器上 `build.sh` 打包 → 搬到断网机器 → `verify_offline.sh` 验收。
+> 💡 **一句话**：CI 自动打包 → 用户 `dpack install dp` → 断网也能装。
 
 ### 仓库结构
 
 ```
 deepmd-offline-installer-skill/
 │
-├─ 📄 README.md          中英文使用文档
-├─ 📄 SKILL.md            Agent 操作手册（Agent 阅读，只做编排）
-├─ 📄 LICENSE             LGPL-3.0
-├─ 📄 HANDOFF.md          交接 & 验收清单
+├─ ⭐ dpack                包管理器入口 — curl | bash 一键安装
+├─ 📁 .github/workflows/
+│  └─    nightly.yml       自动化 nightly 构建（对飙 PyTorch CI）
 │
-├─ 📁 scripts/            固化脚本（Agent 不可即兴写命令）
-│  ├─ ⭐ build.sh         构建入口 — 打包离线安装器
-│  ├─ ⭐ verify_offline   验收入口 — 断网全流程验证
-│  ├─    build_pkg_       Git commit → conda 包（高级）
+├─ 📄 README.md            中英文使用文档
+├─ 📄 SKILL.md              Agent 操作手册（Agent 阅读，只做编排）
+├─ 📄 LICENSE              LGPL-3.0
+│
+├─ 📁 scripts/             固化脚本（Agent 不可即兴写命令）
+│  ├─ ⭐ build.sh          构建入口 — 打包离线安装器
+│  ├─ ⭐ verify_offline.sh 验收入口 — 断网全流程验证
+│  ├─    build_pkg_        Git commit → conda 包（高级）
 │  │     from_commit.sh
-│  └─    freeze.sh        锁定版本 → 可复现构建
+│  └─    freeze.sh         锁定版本 → 可复现构建
 │
-├─ 📁 assets/             constructor 配方
-│  ├─ ⭐ construct.yaml   Jinja2 模板 → 定义装什么
-│  ├─    pre_install.sh   安装前提示
-│  └─    post_install.sh  安装后提示
+├─ 📁 assets/              constructor 配方
+│  ├─ ⭐ construct.yaml    Jinja2 模板 → 定义装什么
+│  ├─ ⭐ manifest.json     工具清单 → dpack 读取下载链接
+│  ├─    version.txt       版本号单一来源
+│  ├─    pre_install.sh    安装前提示
+│  └─    post_install.sh   安装后提示
 │
-├─ 📁 examples/           验证数据
-│  └─    verify-input     最小训练配置（v2 格式）
-│        .json
+├─ 📁 examples/            验证数据
+│  └─    verify-input.json 最小训练配置（v2 格式）
 │
-├─ 📁 evals/              质量评测
-│  ├─    README / prompts / assertions
-│  ├─    run_build_       脚本稳定性（反复构建 N 次）
-│  │     verify.sh
-│  └─    run_agent_        Agent 稳定性（跨模型 N 次）
-│        benchmark.sh
+├─ 📁 evals/               质量评测
+│  ├─    README.md
+│  ├─    run_build_verify  脚本稳定性
+│  └─    run_agent_benchmark Agent 稳定性
 │
 └─ 📁 references/
-   └─    notes.md          排查手册 & GPU / commit 流程
+   └─    notes.md           排查手册 & GPU / commit 流程
 ```
 
 ### 一键安装（推荐）
@@ -265,56 +286,79 @@ LGPL-3.0-or-later
 
 ### What This Is
 
-A [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills) that builds a **self-contained offline installer** (`.sh` file) for DeePMD-kit on an **internet-connected Linux machine**. The resulting installer can be transferred to any **air-gapped machine** and installed with a single bash command, providing the full deepmd-kit stack including `dp train` and `lmp` inference.
+A distribution system for the DeepModeling ecosystem — **PyTorch-style automated nightly builds + offline installer + package manager**.
+
+```
+User Experience                      Infrastructure
+────────────────                     ──────────────
+Online machine:                       GitHub Actions nightly CI
+  dpack install dp                     builds CPU + 4 CUDA variants daily
+  dpack install dp --cuda 12.8         artifacts → GitHub Release
+                                       manifest.json auto-updated
+Air-gapped machine:                   
+  download .sh → bash xxx.sh          conda-forge PR (pending merge):
+  one-line install, no CUDA toolkit    multi-CUDA conda packages
+
+Planned: dpack install dpgen, dpack install <sampling>, ...
+```
+
+Four components:
+
+| Component | File | Modeled After |
+|-----------|------|---------------|
+| **Nightly CI** | `.github/workflows/nightly.yml` | PyTorch trunk CI |
+| **Package manager** | `dpack` | pixi / brew |
+| **Offline builder** | `scripts/build.sh` + `assets/construct.yaml` | conda constructor |
+| **Acceptance test** | `scripts/verify_offline.sh` | smoke test → dp train + lammps |
 
 ### Problem Solved
 
-HPC clusters are typically disconnected from the internet. Standard `conda install` / `pip install` workflows do not work. This skill packages deepmd-kit + LAMMPS + TensorFlow/JAX/PyTorch + MPI + hundreds of dependencies into a single self-extracting archive, transferable via USB, internal network, or any other means.
+HPC clusters are disconnected from the internet. This project packages deepmd-kit + LAMMPS + TF/JAX/PyTorch + MPI + all dependencies into a single self-extracting archive. Future: `dpack install dpgen`, sampling tools, distillation tools — one package manager for the entire DeepModeling ecosystem.
 
 ### How It Works
 
 | Phase | Where | What | Output |
 |-------|-------|------|--------|
-| **① Config** | Your machine | Tell `build.sh` what you want: version, CPU/GPU, backend, hardware | A set of flags |
-| **② Fetch & Pack** | Internet-connected Linux | `constructor` reads `construct.yaml`, downloads everything from conda-forge, packages into one file | `xxx.sh` (1.4–3 GB) |
-| **③ Transfer** | Any method | USB / LAN / scp to air-gapped server | — |
-| **④ Install** | Air-gapped server | `bash xxx.sh -b -p /opt/deepmd` | Full deepmd-kit environment |
-| **⑤ Verify** | Air-gapped server | `verify_offline.sh` isolates network → install → dp train → freeze → LAMMPS MD | ✅ or ❌ |
+| **① Build** | GitHub Actions | Nightly CI builds multi-CUDA variants | Release .sh files |
+| **② Install** | Any Linux | `dpack install dp` or `bash xxx.sh` | deepmd-kit environment |
+| **③ Verify** | Any Linux | `verify_offline.sh` cut net → install → train → lammps | ✅ or ❌ |
 
-> 💡 **TL;DR**: `build.sh` on networked machine → transfer → `verify_offline.sh` on air-gapped machine.
+> 💡 **TL;DR**: CI auto-builds → user runs `dpack install dp` → works offline.
 
 ### Repository Layout
 
 ```
 deepmd-offline-installer-skill/
 │
+├─ ⭐ dpack              Package manager entry — curl | bash install
+├─ 📁 .github/workflows/
+│  └─    nightly.yml     Nightly CI (PyTorch-style automated builds)
+│
 ├─ 📄 README.md          User guide (CN + EN)
 ├─ 📄 SKILL.md           Agent manual (orchestration only)
 ├─ 📄 LICENSE            LGPL-3.0
-├─ 📄 HANDOFF.md         Sign-off checklist
 │
 ├─ 📁 scripts/           Frozen scripts (never hand-write commands)
 │  ├─ ⭐ build.sh        Build entry point
-│  ├─ ⭐ verify_offline  Acceptance entry point
+│  ├─ ⭐ verify_offline.sh Acceptance entry point
 │  ├─    build_pkg_      Git commit → conda package (advanced)
 │  │     from_commit.sh
 │  └─    freeze.sh       Pin versions → reproducible builds
 │
 ├─ 📁 assets/            constructor recipe
 │  ├─ ⭐ construct.yaml  Jinja2 template → bill of materials
+│  ├─ ⭐ manifest.json   Tool catalog → dpack reads download URLs
+│  ├─    version.txt     Single source of truth for base version
 │  ├─    pre_install.sh  Pre-install notes
 │  └─    post_install.sh Post-install guidance
 │
 ├─ 📁 examples/          Verification data
-│  └─    verify-input    Minimal training config (v2 format)
-│        .json
+│  └─    verify-input.json Minimal training config (v2 format)
 │
 ├─ 📁 evals/             Quality benchmarks
-│  ├─    README / prompts / assertions
-│  ├─    run_build_      Script-level stability
-│  │     verify.sh
-│  └─    run_agent_      Agent-level stability
-│        benchmark.sh
+│  ├─    README.md
+│  ├─    run_build_verify  Script-level stability
+│  └─    run_agent_benchmark Agent-level stability
 │
 └─ 📁 references/
    └─    notes.md        Deep-dive & troubleshooting
