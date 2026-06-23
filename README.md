@@ -27,10 +27,10 @@ dpack install dp --file ./xxx.sh   # 指向本地包，一行安装，无需 CUD
 
 | 组件 | 文件 | 对标 |
 |------|------|------|
-| 📦 包管理器 | `dpack` + `install.sh` | pixi / brew / dp1s |
-| 🔄 自动构建 | `.github/workflows/nightly.yml` | PyTorch nightly |
-| 🏗️ 离线包构建 | `scripts/build.sh` + `assets/construct.yaml` | conda constructor |
-| ✅ 断网验收 | `scripts/verify_offline.sh` | dp train + lammps |
+| 包管理器 | `dpack` + `install.sh` | pixi / brew / dp1s |
+| 自动构建 | `.github/workflows/nightly.yml` | PyTorch nightly |
+| 离线包构建 | `scripts/build.sh` + `assets/construct.yaml` | conda constructor |
+| 断网验收 | `scripts/verify_offline.sh` | dp train + lammps |
 
 ### 解决的问题
 
@@ -306,10 +306,10 @@ Four components:
 
 | Component | File | Modeled After |
 |-----------|------|---------------|
-| 📦 Package manager | `dpack` + `install.sh` | pixi / brew / dp1s |
-| 🔄 Nightly CI | `.github/workflows/nightly.yml` | PyTorch nightly |
-| 🏗️ Offline builder | `scripts/build.sh` + `assets/construct.yaml` | conda constructor |
-| ✅ Acceptance test | `scripts/verify_offline.sh` | dp train + lammps |
+| Package manager | `dpack` + `install.sh` | pixi / brew / dp1s |
+| Nightly CI | `.github/workflows/nightly.yml` | PyTorch nightly |
+| Offline builder | `scripts/build.sh` + `assets/construct.yaml` | conda constructor |
+| Acceptance test | `scripts/verify_offline.sh` | dp train + lammps |
 
 ### Problem Solved
 
