@@ -121,20 +121,23 @@ export VERSION CUDA_VERSION DEEPMD_BUILD DEEPMD_LOCAL_CHANNEL DEEPMD_PY_VERSION 
 # --- GPU build needs virtual-package overrides so a GPU-LESS build node can
 #     solve+download the CUDA variant (matches upstream installer CI) ----------
 if [[ -n "$CUDA_VERSION" ]]; then
-  # conda-forge currently publishes deepmd-kit only as a cuda129 build, which
-  # hard-pins `cuda-version >=12.9,<13`. Any --cuda below 12.9 (or a 13.x major)
-  # therefore makes the constructor solve fail with a cryptic Unsatisfiable
-  # error. Fail fast here with an explanation instead. A single cuda129 package
-  # already covers the whole 12.x driver line via NVIDIA minor-version compat.
-  # Remove/adjust this guard once upstream ships per-minor or cuda13 builds.
-  cuda_major="${CUDA_VERSION%%.*}"
-  cuda_minor="${CUDA_VERSION#*.}"; cuda_minor="${cuda_minor%%.*}"
-  if [[ "$cuda_major" != "12" || "${cuda_minor:-0}" -lt 9 ]]; then
-    fail "--cuda $CUDA_VERSION is not buildable from conda-forge today.
-    The published deepmd-kit cuda129 build hard-pins cuda-version >=12.9,<13.
-    Use --cuda 12.9 (it covers the whole CUDA 12.x driver line + 13.0 via
-    NVIDIA minor-version compatibility). CUDA 13.x needs an upstream cuda13
-    deepmd/TF/PyTorch stack that does not exist on conda-forge yet."
+  # conda-forge ships exactly one cudaXXX build per deepmd-kit release, and that
+  # build hard-pins its own cuda-version (e.g. the 3.2.0b0 cuda129 build pins
+  # `cuda-version >=12.9,<13`). Asking for a --cuda whose cudaXXX build does not
+  # exist for this version makes constructor fail with a cryptic Unsatisfiable
+  # error. Verify the exact cudaXXX build exists first and fail fast with a clear
+  # message + the list of CUDA versions that ARE available for this release.
+  cuda_tag="cuda${CUDA_VERSION//./}"
+  echo "==> Checking conda-forge has a ${cuda_tag} build for deepmd-kit ${VERSION}..."
+  avail="$(conda search -c conda-forge/label/deepmd-kit_rc -c conda-forge \
+            "deepmd-kit=${VERSION}" 2>/dev/null \
+            | awk '/cuda/{b=$3; sub(/py.*/,"",b); print b}' | sort -u)"
+  if [[ -n "$avail" ]] && ! grep -qx "$cuda_tag" <<<"$avail"; then
+    fail "conda-forge has no ${cuda_tag} build for deepmd-kit ${VERSION}.
+    Available CUDA builds for ${VERSION}: $(echo $avail | tr '\n' ' ')
+    Pick a --cuda matching one of those, or choose a deepmd-kit version that
+    publishes the CUDA build you want. (conda-forge ships one cudaXXX per
+    release; CUDA 12.8 and 13.x were never published for any deepmd version.)"
   fi
   export CONDA_OVERRIDE_CUDA="$CUDA_VERSION"
   export CONDA_OVERRIDE_GLIBC="${CONDA_OVERRIDE_GLIBC:-${TARGET_GLIBC:-2.28}}"
