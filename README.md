@@ -8,28 +8,29 @@
 
 ### 这是什么
 
-DeepModeling 社区的分发体系项目——**对标 PyTorch 的自动化构建 + 离线安装 + 包管理器**。
+DeepModeling 社区的分发体系——**对标 PyTorch 的自动化构建 + 离线安装 + 包管理器**。
 
-```
-用户视角                             后台
-────────                             ────
-有网机器：                              GitHub Actions nightly CI
-  dpack install dp                     每天自动构建 CPU + 4 个 CUDA 版本
-  dpack install dp --cuda 12.8         产物 → GitHub Release / Artifacts
-                                       manifest.json 自动更新
-断网机器：                              
-  下载 .sh → bash xxx.sh              
-  一行安装，不需要 CUDA Toolkit
+**有网机器**
+```bash
+dpack install dp                # 自动检测 GPU，下载 + 安装
+dpack install dp --cuda 12.8    # 指定 CUDA 版本
 ```
 
-包含四个组件：
+**断网机器（超算）**
+```bash
+dpack install dp --file ./xxx.sh   # 指向本地包，一行安装，无需 CUDA Toolkit
+```
+
+**后台**：GitHub Actions 每天自动构建 CPU + 多个 CUDA 版本 → 上传 Release → manifest 自动更新。
+
+四个组件：
 
 | 组件 | 文件 | 对标 |
 |------|------|------|
-| **自动化 nightly 构建** | `.github/workflows/nightly.yml` | PyTorch trunk CI |
-| **包管理器** | `dpack` | pixi / brew |
-| **离线安装包构建** | `scripts/build.sh` + `assets/construct.yaml` | conda constructor |
-| **断网验收** | `scripts/verify_offline.sh` | 冒烟测试 → dp train + lammps |
+| 📦 包管理器 | `dpack` + `install.sh` | pixi / brew / dp1s |
+| 🔄 自动构建 | `.github/workflows/nightly.yml` | PyTorch nightly |
+| 🏗️ 离线包构建 | `scripts/build.sh` + `assets/construct.yaml` | conda constructor |
+| ✅ 断网验收 | `scripts/verify_offline.sh` | dp train + lammps |
 
 ### 解决的问题
 
@@ -288,26 +289,27 @@ LGPL-3.0-or-later
 
 A distribution system for the DeepModeling ecosystem — **PyTorch-style automated nightly builds + offline installer + package manager**.
 
+**Online machine**
+```bash
+dpack install dp                # auto-detect GPU, download + install
+dpack install dp --cuda 12.8    # explicit CUDA version
 ```
-User Experience                      Infrastructure
-────────────────                     ──────────────
-Online machine:                       GitHub Actions nightly CI
-  dpack install dp                     builds CPU + 4 CUDA variants daily
-  dpack install dp --cuda 12.8         artifacts → GitHub Release
-                                       manifest.json auto-updated
-Air-gapped machine:                   
 
-Planned: dpack install dpgen, dpack install <sampling>, ...
+**Air-gapped machine (HPC)**
+```bash
+dpack install dp --file ./xxx.sh   # install from a local package, no network
 ```
+
+**Infrastructure**: GitHub Actions builds CPU + multiple CUDA variants daily → uploads to Release → manifest auto-updated.
 
 Four components:
 
 | Component | File | Modeled After |
 |-----------|------|---------------|
-| **Nightly CI** | `.github/workflows/nightly.yml` | PyTorch trunk CI |
-| **Package manager** | `dpack` | pixi / brew |
-| **Offline builder** | `scripts/build.sh` + `assets/construct.yaml` | conda constructor |
-| **Acceptance test** | `scripts/verify_offline.sh` | smoke test → dp train + lammps |
+| 📦 Package manager | `dpack` + `install.sh` | pixi / brew / dp1s |
+| 🔄 Nightly CI | `.github/workflows/nightly.yml` | PyTorch nightly |
+| 🏗️ Offline builder | `scripts/build.sh` + `assets/construct.yaml` | conda constructor |
+| ✅ Acceptance test | `scripts/verify_offline.sh` | dp train + lammps |
 
 ### Problem Solved
 
