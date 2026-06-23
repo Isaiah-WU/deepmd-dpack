@@ -187,20 +187,30 @@ bash scripts/verify_offline.sh dist/*.sh <期望版本号>
 bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1.3
 ```
 
-### 已验证的组合
+### 已验证的内容
 
-以下组合已在 Bohrium 平台通过端到端离线验证（`unshare -rn` 切网 → 安装 → `dp train` → `dp freeze` → `lammps` 推理）：
+全部在 Bohrium 平台（4× Tesla V100，驱动 CUDA 13.0）实测通过。
 
-| deepmd-kit | CPU/GPU | 后端 | 训练数据 | 训练时间 | LAMMPS | 状态 |
-|---|---|---|---|---|---|---|
-| 3.1.3 | CPU | TF + JAX | 合成 6 原子 | 3.85s | 123ms | ✅ |
-| 3.2.0b0 | CPU | TF + JAX + PyTorch | **dpa4 真实 192 原子** | — | — | ✅ |
-| 3.2.0b0 | GPU | TF + JAX + PyTorch | 合成 6 原子 | 2.65s | 12ms | ✅ |
-| 3.2.0b0 | GPU | TF + JAX + PyTorch | dpa4 真实 192 原子 | — | — | ✅ |
+**安装方式**
 
-> GPU 节点：4× Tesla V100-SXM2-16GB，CUDA 12.9。LAMMPS 推理 GPU 比 CPU 快 **10 倍**。
->
-> `--cuda` 参数支持任意值，默认 CUDA 12.9，通过 NVIDIA minor-version compatibility 兼容多数 12.x 驱动。
+| 方式 | 命令 | 状态 |
+|---|---|---|
+| dpack 引导安装（用户目录，无 root） | `curl install.sh \| bash` | ✅ |
+| dpack 离线安装（无网，本地包） | `dpack install dp --file ./xxx.sh` | ✅ |
+| dpack 在线安装（自动下载3片→合并→sha256校验→装） | `dpack install dp` | ✅ |
+
+**端到端流程**（`unshare -rn` 切网 → 安装 → train → freeze → lammps）
+
+| deepmd-kit | 变体 | 后端 | 训练数据 | 状态 |
+|---|---|---|---|---|
+| 3.1.3 | CPU | TF + JAX | 合成 | ✅ |
+| 3.2.0b0 | CPU | TF/JAX/PyTorch | dpa4 真实 192 原子 | ✅ |
+| 3.2.0b0 | GPU cuda129 | **PyTorch**（dpa4 真实场景） | 真实 + 合成 | ✅ |
+| 3.2.0b0 | GPU cuda129 | **TensorFlow** | 合成 | ✅ |
+
+> - GPU LAMMPS 推理比 CPU 快 **约 10 倍**（12ms vs 123ms）。
+> - cuda129 包在驱动 CUDA 13.0 上正常运行（NVIDIA 向下兼容）。
+> - TF 后端的 libdevice JIT 问题已修复（pin py_5 + cuda-nvvm + post_install 自愈符号链接）；务必用 **libmamba** solver 构建，classic solver 会导致符号链接断裂。
 
 ### 完整参数列表
 
@@ -436,20 +446,30 @@ bash scripts/build.sh --version 3.1.3 --example dpa4
 bash scripts/verify_offline.sh dist/*.sh <expected_version>
 ```
 
-### Verified Combinations
+### What's Verified
 
-All end-to-end verified on Bohrium (`unshare -rn` isolation → install → `dp train` → `dp freeze` → `lammps` inference):
+All tested on Bohrium (4× Tesla V100, driver CUDA 13.0).
 
-| deepmd-kit | CPU/GPU | Backends | Training Data | Train Time | LAMMPS | Status |
-|---|---|---|---|---|---|---|
-| 3.1.3 | CPU | TF + JAX | Synthetic 6-atom | 3.85s | 123ms | ✅ |
-| 3.2.0b0 | CPU | TF + JAX + PyTorch | **dpa4 real 192-atom** | — | — | ✅ |
-| 3.2.0b0 | GPU | TF + JAX + PyTorch | Synthetic 6-atom | 2.65s | 12ms | ✅ |
-| 3.2.0b0 | GPU | TF + JAX + PyTorch | dpa4 real 192-atom | — | — | ✅ |
+**Install methods**
 
-> GPU node: 4× Tesla V100-SXM2-16GB, CUDA 12.9. LAMMPS inference: GPU 10× faster than CPU.
->
-> `--cuda` accepts any value. Default CUDA 12.9 is compatible with most 12.x drivers via NVIDIA minor-version compatibility.
+| Method | Command | Status |
+|---|---|---|
+| dpack bootstrap (user dir, no root) | `curl install.sh \| bash` | ✅ |
+| dpack offline (no network, local pkg) | `dpack install dp --file ./xxx.sh` | ✅ |
+| dpack online (auto download 3 parts → reassemble → sha256 → install) | `dpack install dp` | ✅ |
+
+**End-to-end** (`unshare -rn` → install → train → freeze → lammps)
+
+| deepmd-kit | Variant | Backend | Training Data | Status |
+|---|---|---|---|---|
+| 3.1.3 | CPU | TF + JAX | Synthetic | ✅ |
+| 3.2.0b0 | CPU | TF/JAX/PyTorch | dpa4 real 192-atom | ✅ |
+| 3.2.0b0 | GPU cuda129 | **PyTorch** (real dpa4 path) | Real + synthetic | ✅ |
+| 3.2.0b0 | GPU cuda129 | **TensorFlow** | Synthetic | ✅ |
+
+> - GPU LAMMPS inference ~**10× faster** than CPU (12ms vs 123ms).
+> - cuda129 runs on a CUDA 13.0 driver (NVIDIA backward compatibility).
+> - TF-backend libdevice JIT issue fixed (pin py_5 + cuda-nvvm + post_install symlink self-heal); build with the **libmamba** solver — classic breaks the symlink.
 
 ### Full Parameter Reference
 
