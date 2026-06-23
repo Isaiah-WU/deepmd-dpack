@@ -146,29 +146,30 @@ dp --version
 
 ### 选择你的版本（对标 PyTorch get-started）
 
-第一步：`nvidia-smi` 看你的 CUDA 驱动版本，选对应的包下载。如果没 GPU，选 CPU。
+第一步：`nvidia-smi` 看有没有 GPU。有就选 GPU 包，没有选 CPU。
 
 | 你的机器 | 下载 |
 |----------|------|
 | CPU（无 GPU） | `bash dist/cpu/*.sh -b -p /opt/deepmd` |
-| CUDA 12.6 驱动 | `bash dist/cuda126/*.sh -b -p /opt/deepmd` |
-| CUDA 12.8 驱动 | `bash dist/cuda128/*.sh -b -p /opt/deepmd` |
-| CUDA 13.1 驱动 | `bash dist/cuda131/*.sh -b -p /opt/deepmd` |
+| 任意 CUDA 12.x ~ 13.0 驱动 | `bash dist/cuda129/*.sh -b -p /opt/deepmd` |
 
 第二步：选的包是一行命令安装——不需要手动装 CUDA Toolkit 或设 CUDA_HOME。
+
+> **关于多 CUDA 版本（重要）**
+> conda-forge 对 deepmd-kit 每个 CUDA 大版本只发**一个** build（当前是 `cuda129`，且硬锁
+> `cuda-version >=12.9,<13`）。靠 [NVIDIA minor-version 兼容](https://docs.nvidia.com/deploy/cuda-compatibility/)，
+> 这一个 `cuda129` 包覆盖**整个 CUDA 12.x 驱动线 + 13.0 驱动**——12.6 / 12.8 / 12.9 的用户都装它，都能跑。
+> 因此不需要（也无法用现成包构建）单独的 cuda126 / cuda128 安装包。
+> CUDA **13.1** 是不同大版本，需等 conda-forge 发布 cuda13 的 TF/PyTorch/deepmd 栈后才能构建。
 
 ### 常用命令
 
 #### 构建不同版本
 
 ```bash
-# 产物自动按 CUDA 分目录：dist/cpu/  dist/cuda128/  dist/cuda131/
-bash scripts/build.sh --cuda 12.6
-bash scripts/build.sh --cuda 12.8
-bash scripts/build.sh --cuda 13.1
-
-# CPU 版
-bash scripts/build.sh
+# CPU 与 GPU（GPU 当前只有 cuda129，原因见上方说明）
+bash scripts/build.sh                 # CPU
+bash scripts/build.sh --cuda 12.9     # GPU（cuda129，覆盖 12.x~13.0 驱动）
 
 # 指定后端（TF / PyTorch / JAX / 全都要）
 bash scripts/build.sh --backend pytorch --torch-version ">=2.5"
@@ -216,7 +217,7 @@ bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1
 | 3.2.0b0 | GPU cuda129 | **TensorFlow** | 合成 | ✅ |
 
 > - GPU LAMMPS 推理比 CPU 快 **约 10 倍**（12ms vs 123ms）。
-> - cuda129 包在驱动 CUDA 13.0 上正常运行（NVIDIA 向下兼容）。
+> - **多 CUDA 策略**：conda-forge 对 deepmd 每个大版本只发一个 build（cuda129，硬锁 `cuda-version >=12.9,<13`）。靠 NVIDIA minor-version 兼容，这一个包覆盖整个 12.x 驱动线 + 13.0 驱动；13.0 驱动已实测 train+lammps 跑通。单独构建 cuda126/cuda128 在用现成包时会 solve 失败、且无实际收益。13.1 是不同大版本，等上游 cuda13 迁移。
 > - TF 后端的 libdevice JIT 问题已修复（pin py_5 + cuda-nvvm + post_install 自愈符号链接）；务必用 **libmamba** solver 构建，classic solver 会导致符号链接断裂。
 > - GPU 安装包解压需 ~44 GB 临时空间，节点系统盘建议 ≥ 100 GB；NAS（NFS）不支持 constructor 解压，须装到本地盘。
 
@@ -483,7 +484,7 @@ All tested on Bohrium (4× Tesla V100, driver CUDA 13.0).
 | 3.2.0b0 | GPU cuda129 | **TensorFlow** | Synthetic | ✅ |
 
 > - GPU LAMMPS inference ~**10× faster** than CPU (12ms vs 123ms).
-> - cuda129 runs on a CUDA 13.0 driver (NVIDIA backward compatibility).
+> - **Multi-CUDA strategy**: conda-forge ships exactly one build per CUDA major for deepmd (cuda129, hard-pinned `cuda-version >=12.9,<13`). Via NVIDIA minor-version compatibility this single package covers the whole CUDA 12.x driver line + 13.0; the 13.0 driver was verified end-to-end (train+lammps). Building a separate cuda126/cuda128 from the published package fails to solve and yields no real benefit. 13.1 is a different CUDA major — blocked on the upstream cuda13 migration.
 > - TF-backend libdevice JIT issue fixed (pin py_5 + cuda-nvvm + post_install symlink self-heal); build with the **libmamba** solver — classic breaks the symlink.
 > - The GPU installer needs ~44 GB temp space to extract; use a node with ≥ 100 GB system disk, and install to a local disk (NFS/NAS cannot extract constructor packages).
 

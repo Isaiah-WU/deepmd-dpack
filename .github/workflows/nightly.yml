@@ -26,11 +26,13 @@ jobs:
             cuda: ''
           - label: CUDA 12.9
             cuda: '12.9'
-          # Uncomment when conda-forge publishes these variants:
-          # - label: CUDA 12.6
-          #   cuda: '12.6'
-          # - label: CUDA 12.8
-          #   cuda: '12.8'
+          # Only cuda129 is buildable from conda-forge today. The published
+          # deepmd-kit cuda129 build hard-pins `cuda-version >=12.9,<13`, so
+          # --cuda 12.6/12.8 fail to solve; by NVIDIA minor-version
+          # compatibility the single cuda129 package already covers the whole
+          # CUDA 12.x driver line + 13.0. CUDA 13.1 is a different major and is
+          # blocked until conda-forge publishes a cuda13 TF/PyTorch/deepmd stack.
+          # Re-enable per-minor rows only if upstream adds those builds:
           # - label: CUDA 13.1
           #   cuda: '13.1'
 
