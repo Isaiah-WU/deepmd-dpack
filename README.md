@@ -199,6 +199,13 @@ bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1
 | dpack 离线安装（无网，本地包） | `dpack install dp --file ./xxx.sh` | ✅ |
 | dpack 在线安装（自动下载3片→合并→sha256校验→装） | `dpack install dp` | ✅ |
 
+**跨镜像**（确认换基础镜像也能装）
+
+| 基础镜像 | 安装方式 | 状态 |
+|---|---|---|
+| ubuntu22.04-py3.10 | dpack 在线 + 离线 | ✅ |
+| ubuntu24.04-py3.12 | dpack 在线（下载→合并→校验→装） | ✅ |
+
 **端到端流程**（`unshare -rn` 切网 → 安装 → train → freeze → lammps）
 
 | deepmd-kit | 变体 | 后端 | 训练数据 | 状态 |
@@ -211,6 +218,7 @@ bash scripts/verify_offline.sh dist/deepmd-kit-3.1.3-cuda129-Linux-x86_64.sh 3.1
 > - GPU LAMMPS 推理比 CPU 快 **约 10 倍**（12ms vs 123ms）。
 > - cuda129 包在驱动 CUDA 13.0 上正常运行（NVIDIA 向下兼容）。
 > - TF 后端的 libdevice JIT 问题已修复（pin py_5 + cuda-nvvm + post_install 自愈符号链接）；务必用 **libmamba** solver 构建，classic solver 会导致符号链接断裂。
+> - GPU 安装包解压需 ~44 GB 临时空间，节点系统盘建议 ≥ 100 GB；NAS（NFS）不支持 constructor 解压，须装到本地盘。
 
 ### 完整参数列表
 
@@ -458,6 +466,13 @@ All tested on Bohrium (4× Tesla V100, driver CUDA 13.0).
 | dpack offline (no network, local pkg) | `dpack install dp --file ./xxx.sh` | ✅ |
 | dpack online (auto download 3 parts → reassemble → sha256 → install) | `dpack install dp` | ✅ |
 
+**Cross-image** (confirm a different base image still installs)
+
+| Base image | Method | Status |
+|---|---|---|
+| ubuntu22.04-py3.10 | dpack online + offline | ✅ |
+| ubuntu24.04-py3.12 | dpack online (download → reassemble → verify → install) | ✅ |
+
 **End-to-end** (`unshare -rn` → install → train → freeze → lammps)
 
 | deepmd-kit | Variant | Backend | Training Data | Status |
@@ -470,6 +485,7 @@ All tested on Bohrium (4× Tesla V100, driver CUDA 13.0).
 > - GPU LAMMPS inference ~**10× faster** than CPU (12ms vs 123ms).
 > - cuda129 runs on a CUDA 13.0 driver (NVIDIA backward compatibility).
 > - TF-backend libdevice JIT issue fixed (pin py_5 + cuda-nvvm + post_install symlink self-heal); build with the **libmamba** solver — classic breaks the symlink.
+> - The GPU installer needs ~44 GB temp space to extract; use a node with ≥ 100 GB system disk, and install to a local disk (NFS/NAS cannot extract constructor packages).
 
 ### Full Parameter Reference
 
