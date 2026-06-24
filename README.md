@@ -49,9 +49,9 @@ dp --version
 
 | 工具 | 说明 | 状态 |
 |------|------|------|
-| `dp` | DeePMD-kit + LAMMPS + TF/JAX/PyTorch | ✅ 可用 |
-| `dpgen` | 自动数据生成 | 🚧 规划中 |
-| 更多 | 采样 / 蒸馏 / … | 🚧 规划中 |
+| `dp` | DeePMD-kit + LAMMPS + TF/JAX/PyTorch | 可用 |
+| `dpgen` | 自动数据生成 | 规划中 |
+| 更多 | 采样 / 蒸馏 / … | 规划中 |
 
 目标：**一个 `dpack` 装整个 DeepModeling 生态**（`dpack install dpgen`、`dpack upgrade dp` 等逐步支持）。
 
@@ -97,31 +97,31 @@ LAMMPS + TF/JAX/PyTorch + MPI + 全部依赖打包成单个自包含文件——
 
 ```
 deepmd-dpack/
-├─ ⭐ dpack                  包管理器（用户入口）
-├─ ⭐ install.sh             dpack 引导安装脚本（curl | bash）
+├─ dpack                  包管理器（用户入口）
+├─ install.sh             dpack 引导安装脚本（curl | bash）
 │
-├─ 📁 .github/workflows/
-│  └─    nightly.yml         每日自动构建 + 发布（对标 PyTorch nightly）
+├─ .github/workflows/
+│  └─ nightly.yml         每日自动构建 + 发布（对标 PyTorch nightly）
 │
-├─ 📁 scripts/               固化构建/验收脚本
-│  ├─    build.sh            构建离线安装包
-│  ├─    verify_offline.sh   断网全流程验收（dp train + lammps）
-│  ├─    gen_manifest_fragment.py / merge_manifest.py  manifest 自动生成
-│  ├─    build_pkg_from_commit.sh  Git commit → conda 包（高级）
-│  └─    freeze.sh           锁定版本 → 可复现构建
+├─ scripts/               固化构建/验收脚本
+│  ├─ build.sh            构建离线安装包
+│  ├─ verify_offline.sh   断网全流程验收（dp train + lammps）
+│  ├─ gen_manifest_fragment.py / merge_manifest.py  manifest 自动生成
+│  ├─ build_pkg_from_commit.sh  Git commit → conda 包（高级）
+│  └─ freeze.sh           锁定版本 → 可复现构建
 │
-├─ 📁 assets/                constructor 配方 + 工具清单
-│  ├─    construct.yaml      Jinja2 模板（定义装什么）
-│  ├─    manifest.json       工具清单（dpack 读它拿下载链接，由 CI 自动更新）
-│  ├─    version.txt         版本号单一来源
-│  └─    pre/post_install.sh 安装前后钩子
+├─ assets/                constructor 配方 + 工具清单
+│  ├─ construct.yaml      Jinja2 模板（定义装什么）
+│  ├─ manifest.json       工具清单（dpack 读它拿下载链接，由 CI 自动更新）
+│  ├─ version.txt         版本号单一来源
+│  └─ pre/post_install.sh 安装前后钩子
 │
-├─ 📄 SKILL.md               附带的 Claude Code skill（Agent 编排构建）
-├─ 📄 HANDOFF.md             开发交接 + 验收清单（内部）
-├─ 📁 references/            内部文档（用户无需阅读）
-│  ├─    notes.md            构建/排查参考、GPU/commit 流程
-│  └─    verification-log.md 验证记录（Bohrium 实测结果与踩坑）
-└─ 📁 examples/ evals/       验证数据 / 质量评测
+├─ SKILL.md               附带的 Claude Code skill（Agent 编排构建）
+├─ HANDOFF.md             开发交接 + 验收清单（内部）
+├─ references/            内部文档（用户无需阅读）
+│  ├─ notes.md            构建/排查参考、GPU/commit 流程
+│  └─ verification-log.md 验证记录（Bohrium 实测结果与踩坑）
+└─ examples/ evals/       验证数据 / 质量评测
 ```
 
 ### 自动发布闭环（nightly.yml）
@@ -205,9 +205,9 @@ dp --version
 
 | Tool | Description | Status |
 |------|-------------|--------|
-| `dp` | DeePMD-kit + LAMMPS + TF/JAX/PyTorch | ✅ available |
-| `dpgen` | Automated data generation | 🚧 planned |
-| more | sampling / distillation / … | 🚧 planned |
+| `dp` | DeePMD-kit + LAMMPS + TF/JAX/PyTorch | available |
+| `dpgen` | Automated data generation | planned |
+| more | sampling / distillation / … | planned |
 
 Goal: **one `dpack` for the whole DeepModeling ecosystem** (`dpack install dpgen`, `dpack upgrade dp`, …).
 
