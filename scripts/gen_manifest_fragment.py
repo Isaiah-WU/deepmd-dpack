@@ -8,7 +8,7 @@ fragment to frag/<variant>.json. A later job merges all fragments into
 assets/manifest.json (see merge_manifest.py).
 
 Env / args:
-  REPO       owner/repo, e.g. Isaiah-WU/dpack            (default from git or env)
+  REPO       owner/repo, e.g. Isaiah-WU/deepmd-dpack            (default from git or env)
   CUDA       cuda version like "12.9", or "" for the CPU build
   VERSION    deepmd-kit version (default: read assets/version.txt)
 """
@@ -18,7 +18,7 @@ import json
 import os
 import sys
 
-repo = os.environ.get("REPO", "Isaiah-WU/dpack")
+repo = os.environ.get("REPO", "Isaiah-WU/deepmd-dpack")
 cuda = os.environ.get("CUDA", "").strip()
 version = os.environ.get("VERSION", "").strip()
 if not version:

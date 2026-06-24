@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # dpack bootstrap installer — like dp1s / pixi / rustup.
 #
-#   curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/dpack/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-dpack/main/install.sh | bash
 #
 # Installs the `dpack` command into your USER directory (no root needed),
 # then you run:  dpack install dp
 set -euo pipefail
 
-REPO="Isaiah-WU/dpack"
+REPO="Isaiah-WU/deepmd-dpack"
 DPACK_URL="https://raw.githubusercontent.com/${REPO}/main/dpack"
 
 # Install to user bin (no root). Honor XDG, fall back to ~/.local/bin.

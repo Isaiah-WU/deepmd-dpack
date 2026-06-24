@@ -15,7 +15,7 @@
 
 ```bash
 # 1. 装 dpack（用户目录，无需 root）
-curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/dpack/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-dpack/main/install.sh | bash
 
 # 2. 装 deepmd-kit —— 自动检测 GPU/CUDA，下载对应版本并安装
 dpack install dp
@@ -99,7 +99,7 @@ dpack upgrade dp          # 规划中
 ### 仓库结构
 
 ```
-dpack/
+deepmd-dpack/
 ├─ ⭐ dpack                  包管理器（用户入口）
 ├─ ⭐ install.sh             dpack 引导安装脚本（curl | bash）
 │
@@ -129,8 +129,8 @@ dpack/
 ### 构建一个离线包
 
 ```bash
-git clone https://github.com/Isaiah-WU/dpack.git
-cd dpack
+git clone https://github.com/Isaiah-WU/deepmd-dpack.git
+cd deepmd-dpack
 
 bash scripts/build.sh                 # CPU 版（约 10-15 分钟）
 bash scripts/build.sh --cuda 12.9     # GPU 版（覆盖 12.x~13.0 驱动）
@@ -181,7 +181,7 @@ including air-gapped HPC — no conda, CUDA, or dependency wrangling needed.
 
 ```bash
 # 1. Install dpack (user dir, no root)
-curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/dpack/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-dpack/main/install.sh | bash
 
 # 2. Install deepmd-kit — auto-detects GPU/CUDA, downloads + installs the right build
 dpack install dp
@@ -248,8 +248,8 @@ whole ecosystem.
 > packages dpack distributes.
 
 ```bash
-git clone https://github.com/Isaiah-WU/dpack.git
-cd dpack
+git clone https://github.com/Isaiah-WU/deepmd-dpack.git
+cd deepmd-dpack
 
 bash scripts/build.sh                 # CPU build (~10-15 min)
 bash scripts/build.sh --cuda 12.9     # GPU build (covers 12.x~13.0 drivers)

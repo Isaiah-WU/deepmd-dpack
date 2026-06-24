@@ -17,7 +17,7 @@
 set -euo pipefail
 
 DPACK_HOME="${DPACK_HOME:-$HOME/.dpack}"
-MANIFEST_URL="${DPACK_MANIFEST_URL:-https://raw.githubusercontent.com/Isaiah-WU/dpack/main/assets/manifest.json}"
+MANIFEST_URL="${DPACK_MANIFEST_URL:-https://raw.githubusercontent.com/Isaiah-WU/deepmd-dpack/main/assets/manifest.json}"
 INSTALLED_DB="$DPACK_HOME/installed.json"
 CACHE_DIR="$DPACK_HOME/cache"
 

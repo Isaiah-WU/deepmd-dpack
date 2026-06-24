@@ -5,14 +5,14 @@ Reads every frag/**/<variant>.json produced by gen_manifest_fragment.py across t
 build matrix and writes a single assets/manifest.json that dpack consumes.
 
 Env:
-  REPO       owner/repo, e.g. Isaiah-WU/dpack
+  REPO       owner/repo, e.g. Isaiah-WU/deepmd-dpack
   VERSION    deepmd-kit version (default: read assets/version.txt)
 """
 import glob
 import json
 import os
 
-repo = os.environ.get("REPO", "Isaiah-WU/dpack")
+repo = os.environ.get("REPO", "Isaiah-WU/deepmd-dpack")
 version = os.environ.get("VERSION", "").strip()
 if not version:
     with open("assets/version.txt") as fh:
