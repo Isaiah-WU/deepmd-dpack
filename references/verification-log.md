@@ -97,8 +97,7 @@ bash scripts/verify_offline.sh ~/.dpack/cache/dp-cuda129.sh 3.2.0b0   # → VERI
 ```
 
 机制：包自带 cuda129 运行时，不用宿主机 toolkit → 验证的是"宿主机任何 CUDA toolkit（12.1~13.1）
-下包都能独立装跑"。13.0 那行是真驱动层面（`nvidia-smi`=13.0）。换真驱动版本需非 Bohrium 机器，
-但 cuda129 跨驱动可用由 NVIDIA 向后/minor 兼容保证。
+下包都能独立装跑"。换真驱动版本需非 Bohrium 机器，但 cuda129 跨驱动可用由 NVIDIA 向后/minor 兼容保证。
 
 ## 5. TF 后端 libdevice 修复
 
