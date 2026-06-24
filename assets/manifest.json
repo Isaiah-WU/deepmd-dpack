@@ -19,7 +19,7 @@
             "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh.1",
             "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh.2"
           ],
-          "sha256": "0e8cec99e50d91392a98f5f370c9c7724142b6892b815d7612f50aa55ef47367"
+          "sha256": "3c167fb4684127ae8a7afdfc3346d59cabb9e72b549b7b55981d9ca511aa14a1"
         },
         "cpu": {
           "type": "cpu",
