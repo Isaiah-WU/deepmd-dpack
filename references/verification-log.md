@@ -39,92 +39,66 @@ GPU LAMMPS 推理比 CPU 快约 10 倍（12ms vs 123ms）。
 
 ## 4. 多 CUDA 版本
 
-### 4.1 为什么 3.2.0b0 只能是 cuda129（依赖图实证）
+### 4.1 3.2.0b0 只能是 cuda129
 
-deepmd 3.2.0b0 同时依赖 **TensorFlow 2.19** 和 **PyTorch 2.11**（feedstock
-`conda_build_config.yaml` 钉死）。这两个在 conda-forge 上的 CUDA 构建：
+deepmd 3.2.0b0 依赖 TF 2.19 + PyTorch 2.11（feedstock 钉死），两者 CUDA 构建交集只有 cuda129：
 
 ```
-TensorFlow 2.19：cuda128, cuda129
-PyTorch    2.11：cuda129, cuda130
-两者交集       ：cuda129   ← deepmd 3.2.0b0 唯一能成立的 CUDA 版本
+TF 2.19     : cuda128, cuda129
+PyTorch 2.11: cuda129, cuda130
+交集        : cuda129
 ```
-
-实测命令（任意有 conda 的机器）：
 ```bash
-conda search -c conda-forge "pytorch=2.11"    | grep -oE 'cuda[0-9]+' | sort -u  # cuda129 cuda130
 conda search -c conda-forge "tensorflow=2.19" | grep -oE 'cuda[0-9]+' | sort -u  # cuda128 cuda129
+conda search -c conda-forge "pytorch=2.11"    | grep -oE 'cuda[0-9]+' | sort -u  # cuda129 cuda130
 ```
 
-→ **cuda126 / cuda128 / cuda13x 对 3.2.0b0 都做不出来**（缺 TF 或缺 PyTorch），
-连源码编（Mode B）也救不了——不是我们没编，是上游 TF/PyTorch 的 CUDA 构建不重合。
-这由 Google/Meta 发布的 CUDA 版本决定。PyTorch 已有 cuda130（CUDA 13），但 TF 还没有，
-所以等 TF 发 CUDA-13，deepmd 才能编 cuda130。
+cuda126/128/13x 对 3.2.0b0 都做不出（缺 TF 或缺 PyTorch），源码编也不行——上游构建不重合。
 
-### 4.2 源码编 cuda128 的尝试与实证（Mode B，已验证不可行）
+### 4.2 cuda128 源码编实证不可行
 
-在 32 核节点用 conda-build + 3.2.0b0 的 feedstock 配方（commit `5bd8a7e`）尝试编 cuda128，
-dry-run solve 直接证明 PyTorch 2.11 没有 cuda128：
-
+feedstock（commit `5bd8a7e`）+ conda-build，dry-run 即证 PyTorch 2.11 无 cuda128：
 ```bash
 CONDA_OVERRIDE_CUDA=12.8 conda create -n probe128 --dry-run \
   -c conda-forge/label/deepmd-kit_rc -c conda-forge \
   "cuda-version=12.8" "tensorflow=2.19.*=*cuda*" "pytorch=2.11.*=*cuda*"
-# → pytorch-2.11.0-cuda129_generic requires cuda-version >=12.9,<13  ⊥ cuda-version 12.8
-#   （PyTorch 2.11 只有 cuda129/cuda130，没有 cuda128）
+# → pytorch 2.11 requires cuda-version >=12.9  ⊥  cuda-version 12.8
 ```
 
-### 4.3 conda-forge deepmd-kit 历史 CUDA 矩阵（`conda search` 实测）
+### 4.3 conda-forge deepmd CUDA 矩阵（`conda search` 实测）
 
 ```
-2.0.3 ~ 2.1.4   cuda102 / cuda110 / cuda111 / cuda112
-2.2.6 ~ 2.2.11  cuda112 / cuda118 / cuda120
-3.0.0           cuda120
-3.0.1 ~ 3.1.0   cuda126
-3.1.1           cuda126 + cuda129
-3.1.2 ~ 3.2.0b0 cuda129
+2.0.3~2.1.4    cuda102/110/111/112
+2.2.6~2.2.11   cuda112/118/120
+3.0.1~3.1.0    cuda126
+3.1.1          cuda126 + cuda129
+3.1.2~3.2.0b0  cuda129
 ```
+3.1.1 有 cuda126 因配 TF 2.18；3.2.0b0 配 TF 2.19 故只有 cuda129。旧版无 dpa4，不能用。
 
-注：旧版本（3.1.1）能有 cuda126，是因为它配的是 TF 2.18（TF 2.18 有 cuda126）。
-3.2.0b0 配 TF 2.19，所以只有 cuda129。**不能为了凑 12.6 用旧版 deepmd——旧版没有 dpa4。**
+### 4.4 跨 CUDA 环境独立验证
 
-### 4.4 跨 CUDA 环境的独立验证（dpack 安装 + 完整 train/freeze/lammps）
+同一个 cuda129 包，dpack 安装 + 完整 train/freeze/lammps。Bohrium 实测（驱动统一 13.0，变 toolkit）：
 
-由于 3.2.0b0 只能是 cuda129 这一个包，"多 CUDA 验证" = 在**不同 CUDA 环境**的节点上，
-各自用 dpack 装这同一个 cuda129 包，独立跑通完整 train + freeze + lammps。靠 NVIDIA
-向后兼容，cuda129 包在所有 CUDA 12.x ~ 13.x 环境都能跑。
+| CUDA 环境 | 造法 | GPU | 全流程 | 状态 |
+|---|---|---|---|---|
+| 无 toolkit | ubuntu24.04 镜像 | V100 | train+freeze+lammps | ✅ |
+| 12.1 | ubuntu22.04-cuda12.1 镜像 | T4 | 同上 | ✅ |
+| 12.6 | `conda install cuda-toolkit=12.6` | T4 | 同上 | ✅ |
+| 12.8 | `conda install cuda-toolkit=12.8` | T4 | 同上 | ✅ |
+| 13.0 | toolkit 13.0 + 驱动本就是 13.0 | T4 | 同上 | ✅ |
+| 13.1 | `conda install cuda-toolkit=13.1` | T4 | 同上 | ✅ |
 
-实测于 Bohrium（驱动统一 13.0）：
-
-| 节点 CUDA 环境 | 怎么造出该环境 | GPU | 安装方式 | train+freeze+lammps | 状态 |
-|---|---|---|---|---|---|
-| 无 host toolkit | ubuntu24.04-py3.12 镜像 | V100 | dpack 在线 | 全流程 | ✅ |
-| CUDA 12.1 | ubuntu22.04-cuda12.1 镜像自带 | T4 | dpack 在线 | 全流程 | ✅ |
-| **CUDA 12.6** | `conda install cuda-toolkit=12.6` | T4 | dpack（缓存包）| 全流程 | ✅ |
-| **CUDA 12.8** | `conda install cuda-toolkit=12.8` | T4 | dpack（缓存包）| 全流程 | ✅ |
-| **CUDA 13.0** | toolkit 13.0 + **驱动本就是 13.0** | T4 | dpack（缓存包）| 全流程 | ✅ |
-| **CUDA 13.1** | `conda install cuda-toolkit=13.1` | T4 | dpack（缓存包）| 全流程 | ✅ |
-
-> 其中 **13.0 最扎实**：不只 toolkit 是 13.0，Bohrium 节点的**驱动本身就是 13.0**
-> （`nvidia-smi` 显示 `CUDA Version: 13.0`）——即这是真正的**驱动层面 13.0 验证**，
-> 我们的 cuda129 包就是在 13.0 驱动上跑通的。其余 12.6/12.8/13.1 变的是 toolkit，驱动同为 13.0。
-
-复现一个环境（以 12.6 为例）：
+复现（以 12.6 为例）：
 ```bash
 conda create -p /tmp/cuda126 -c conda-forge cuda-toolkit=12.6 -y
-export PATH="/tmp/cuda126/bin:$PATH"; nvcc --version | grep release   # → 12.6
-bash scripts/verify_offline.sh ~/.dpack/cache/dp-cuda129.sh 3.2.0b0    # → VERIFY PASSED
+export PATH="/tmp/cuda126/bin:$PATH"; nvcc --version | grep release
+bash scripts/verify_offline.sh ~/.dpack/cache/dp-cuda129.sh 3.2.0b0   # → VERIFY PASSED
 ```
 
-> **重要说明（机制）**：Bohrium 所有节点的 **驱动统一是 13.0**（宿主机注入，选任何镜像都不变）；
-> 上表变的是**容器里的 CUDA toolkit**（镜像自带或 `conda install cuda-toolkit=X` 装出来）。
-> 我们的包**自带 cuda129 运行时**，不用宿主机 toolkit——所以这组验证证明的是：**宿主机无论是
-> 什么 CUDA toolkit 环境（老到 12.1、新到 13.1，甚至没装），我们的包都能独立装、独立跑通全流程**
-> （自包含）。
->
-> 要测真正不同的**驱动版本**（真 12.6 / 12.8 驱动），Bohrium 给不了（驱动固定 13.0），需 AWS
-> 等能选驱动的云或物理机。但 cuda129 在不同驱动上的可用性由 NVIDIA 官方的向后/minor 兼容保证
-> （PyTorch 的 cuXXX wheel 依赖的是同一套机制），且 13.0 驱动已实测跑通。
+机制：包自带 cuda129 运行时，不用宿主机 toolkit → 验证的是"宿主机任何 CUDA toolkit（12.1~13.1）
+下包都能独立装跑"。13.0 那行是真驱动层面（`nvidia-smi`=13.0）。换真驱动版本需非 Bohrium 机器，
+但 cuda129 跨驱动可用由 NVIDIA 向后/minor 兼容保证。
 
 ## 5. TF 后端 libdevice 修复
 
