@@ -102,7 +102,12 @@ CONDA_OVERRIDE_CUDA=12.8 conda create -n probe128 --dry-run \
 | CUDA 12.1 | ubuntu22.04-cuda12.1 镜像自带 | T4 | dpack 在线 | 全流程 | ✅ |
 | **CUDA 12.6** | `conda install cuda-toolkit=12.6` | T4 | dpack（缓存包）| 全流程 | ✅ |
 | **CUDA 12.8** | `conda install cuda-toolkit=12.8` | T4 | dpack（缓存包）| 全流程 | ✅ |
+| **CUDA 13.0** | toolkit 13.0 + **驱动本就是 13.0** | T4 | dpack（缓存包）| 全流程 | ✅ |
 | **CUDA 13.1** | `conda install cuda-toolkit=13.1` | T4 | dpack（缓存包）| 全流程 | ✅ |
+
+> 其中 **13.0 最扎实**：不只 toolkit 是 13.0，Bohrium 节点的**驱动本身就是 13.0**
+> （`nvidia-smi` 显示 `CUDA Version: 13.0`）——即这是真正的**驱动层面 13.0 验证**，
+> 我们的 cuda129 包就是在 13.0 驱动上跑通的。其余 12.6/12.8/13.1 变的是 toolkit，驱动同为 13.0。
 
 复现一个环境（以 12.6 为例）：
 ```bash
