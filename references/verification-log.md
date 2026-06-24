@@ -92,20 +92,34 @@ CONDA_OVERRIDE_CUDA=12.8 conda create -n probe128 --dry-run \
 
 由于 3.2.0b0 只能是 cuda129 这一个包，"多 CUDA 验证" = 在**不同 CUDA 环境**的节点上，
 各自用 dpack 装这同一个 cuda129 包，独立跑通完整 train + freeze + lammps。靠 NVIDIA
-向后兼容，cuda129 包在所有 CUDA 12.x ~ 13.0 环境都能跑。
+向后兼容，cuda129 包在所有 CUDA 12.x ~ 13.x 环境都能跑。
 
-| 节点 CUDA 环境 | 镜像 | GPU | 安装方式 | train+freeze+lammps | 状态 |
+实测于 Bohrium（驱动统一 13.0）：
+
+| 节点 CUDA 环境 | 怎么造出该环境 | GPU | 安装方式 | train+freeze+lammps | 状态 |
 |---|---|---|---|---|---|
-| 无 host toolkit | ubuntu24.04-py3.12 | V100 | dpack 在线 | 全流程 | ✅ |
-| **CUDA 12.1 toolkit** | ubuntu22.04-py3.10-cuda12.1 | T4 | dpack 在线 | 全流程 | ✅ |
-| **CUDA 11.6 toolkit** | ubuntu20.04-py3.10-cuda11.6 | T4 | dpack 在线 | 全流程 | ⬜ 进行中 |
+| 无 host toolkit | ubuntu24.04-py3.12 镜像 | V100 | dpack 在线 | 全流程 | ✅ |
+| CUDA 12.1 | ubuntu22.04-cuda12.1 镜像自带 | T4 | dpack 在线 | 全流程 | ✅ |
+| **CUDA 12.6** | `conda install cuda-toolkit=12.6` | T4 | dpack（缓存包）| 全流程 | ✅ |
+| **CUDA 12.8** | `conda install cuda-toolkit=12.8` | T4 | dpack（缓存包）| 全流程 | ✅ |
+| **CUDA 13.1** | `conda install cuda-toolkit=13.1` | T4 | dpack（缓存包）| 全流程 | ✅ |
 
-> **重要说明**：Bohrium 所有节点的 **驱动统一是 13.0**（宿主机注入，选任何镜像都不变）；
-> 上表变的是**容器里的 CUDA toolkit**。这证明我们的包**自包含**——宿主机不管装的是
-> CUDA 12.1 还是古老的 11.6，甚至没装 CUDA toolkit，我们的包都能独立装、独立跑通。
-> 要测真正不同的**驱动版本**（真 12.6 / 12.8 驱动），Bohrium 给不了，需 AWS 等能选驱动
-> 的基础设施或物理机——但靠 NVIDIA 官方的向后/minor 兼容保证（PyTorch 也依赖同一套机制），
-> cuda129 包在这些驱动上同样可用。
+复现一个环境（以 12.6 为例）：
+```bash
+conda create -p /tmp/cuda126 -c conda-forge cuda-toolkit=12.6 -y
+export PATH="/tmp/cuda126/bin:$PATH"; nvcc --version | grep release   # → 12.6
+bash scripts/verify_offline.sh ~/.dpack/cache/dp-cuda129.sh 3.2.0b0    # → VERIFY PASSED
+```
+
+> **重要说明（机制）**：Bohrium 所有节点的 **驱动统一是 13.0**（宿主机注入，选任何镜像都不变）；
+> 上表变的是**容器里的 CUDA toolkit**（镜像自带或 `conda install cuda-toolkit=X` 装出来）。
+> 我们的包**自带 cuda129 运行时**，不用宿主机 toolkit——所以这组验证证明的是：**宿主机无论是
+> 什么 CUDA toolkit 环境（老到 12.1、新到 13.1，甚至没装），我们的包都能独立装、独立跑通全流程**
+> （自包含）。
+>
+> 要测真正不同的**驱动版本**（真 12.6 / 12.8 驱动），Bohrium 给不了（驱动固定 13.0），需 AWS
+> 等能选驱动的云或物理机。但 cuda129 在不同驱动上的可用性由 NVIDIA 官方的向后/minor 兼容保证
+> （PyTorch 的 cuXXX wheel 依赖的是同一套机制），且 13.0 驱动已实测跑通。
 
 ## 5. TF 后端 libdevice 修复
 
