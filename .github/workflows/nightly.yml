@@ -114,7 +114,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v$(cat assets/version.txt)"
-          mapfile -t files < <(find dist -type f \( -name 'deepmd-kit-*.sh' -o -name 'deepmd-kit-*.sh.[0-9]*' \))
+          # A --split build leaves BOTH the parts (.0/.1/.2) and the original
+          # full .sh. Upload ONLY the parts when they exist (the full file is
+          # >2GiB and GitHub rejects it); otherwise upload the single .sh.
+          mapfile -t parts < <(find dist -type f -name 'deepmd-kit-*.sh.[0-9]*' | sort)
+          if [ ${#parts[@]} -gt 0 ]; then
+            files=("${parts[@]}")
+          else
+            mapfile -t files < <(find dist -type f -name 'deepmd-kit-*.sh')
+          fi
           [ ${#files[@]} -gt 0 ] || { echo "no installer to upload"; exit 1; }
           printf 'uploading: %s\n' "${files[@]}"
           gh release upload "$TAG" "${files[@]}" --clobber
