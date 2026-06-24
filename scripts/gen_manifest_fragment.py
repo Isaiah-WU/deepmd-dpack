@@ -22,7 +22,7 @@ repo = os.environ.get("REPO", "Isaiah-WU/deepmd-dpack")
 cuda = os.environ.get("CUDA", "").strip()
 version = os.environ.get("VERSION", "").strip()
 if not version:
-    with open("assets/version.txt") as fh:
+    with open("assets/version.txt", encoding="utf-8") as fh:
         version = fh.read().strip()
 
 tag = f"v{version}"
@@ -58,6 +58,6 @@ else:
 
 os.makedirs("frag", exist_ok=True)
 out = {"variant": subdir, "entry": entry}
-with open(f"frag/{subdir}.json", "w") as fh:
-    json.dump(out, fh, indent=2)
-print(json.dumps(out, indent=2))
+with open(f"frag/{subdir}.json", "w", encoding="utf-8") as fh:
+    json.dump(out, fh, indent=2, ensure_ascii=False)
+print(json.dumps(out, indent=2, ensure_ascii=False))

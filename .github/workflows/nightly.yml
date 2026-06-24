@@ -15,6 +15,12 @@ on:
       - 'assets/version.txt'
       - 'scripts/build.sh'
   workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Which variant(s) to build (use "cpu" for a fast, low-risk first test)'
+        type: choice
+        options: [all, cpu, cuda129]
+        default: all
 
 permissions:
   contents: write          # create releases + commit the regenerated manifest
@@ -24,6 +30,24 @@ defaults:
     shell: bash -el {0}    # login shell so `conda activate` works
 
 jobs:
+  # 0) Decide which variants to build (manual runs can pick cpu / cuda129 / all).
+  setup:
+    name: Select variants
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        run: |
+          V="${{ github.event.inputs.variant || 'all' }}"
+          CPU='{"label":"cpu","cuda":"","split":""}'
+          GPU='{"label":"cuda129","cuda":"12.9","split":"--split 3"}'
+          case "$V" in
+            cpu)     echo "matrix={\"include\":[$CPU]}" >> "$GITHUB_OUTPUT" ;;
+            cuda129) echo "matrix={\"include\":[$GPU]}" >> "$GITHUB_OUTPUT" ;;
+            *)       echo "matrix={\"include\":[$CPU,$GPU]}" >> "$GITHUB_OUTPUT" ;;
+          esac
+
   # 1) Create the Release once (avoids a race when matrix jobs upload in parallel).
   prepare:
     name: Prepare release
@@ -41,24 +65,17 @@ jobs:
               --title "DeePMD-kit ${VERSION} offline installers" \
               --notes "Auto-published by nightly CI. Use dpack to install: \`dpack install dp\`."
 
-  # 2) Build each variant, upload to the Release, emit a manifest fragment.
+  # 2) Build each selected variant, upload to the Release, emit a manifest fragment.
   build:
     name: Build ${{ matrix.label }}
-    needs: prepare
+    needs: [setup, prepare]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - label: cpu
-            cuda: ''
-            split: ''
-          - label: cuda129
-            cuda: '12.9'
-            split: '--split 3'   # GPU .sh > GitHub's 2 GiB per-asset limit
-          # Only cuda129 is buildable from conda-forge today (one cudaXXX build
-          # per deepmd release; it covers the whole 12.x driver line via NVIDIA
-          # minor-version compatibility). See references/verification-log.md.
+      # Only cuda129 is buildable from conda-forge today (one cudaXXX build per
+      # deepmd release; it covers the whole 12.x driver line via NVIDIA
+      # minor-version compatibility). See references/verification-log.md.
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
 

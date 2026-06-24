@@ -15,17 +15,29 @@ import os
 repo = os.environ.get("REPO", "Isaiah-WU/deepmd-dpack")
 version = os.environ.get("VERSION", "").strip()
 if not version:
-    with open("assets/version.txt") as fh:
+    with open("assets/version.txt", encoding="utf-8") as fh:
         version = fh.read().strip()
 
+# Start from the EXISTING manifest so variants not rebuilt this run are preserved
+# (a CPU-only run must not wipe the live cuda129 entry). Then overlay fresh fragments.
 variants = {}
+try:
+    with open("assets/manifest.json", encoding="utf-8") as fh:
+        variants = json.load(fh).get("tools", {}).get("dp", {}).get("variants", {})
+except (FileNotFoundError, json.JSONDecodeError):
+    variants = {}
+
+fresh = 0
 for f in sorted(glob.glob("frag/**/*.json", recursive=True)):
-    with open(f) as fh:
+    with open(f, encoding="utf-8") as fh:
         frag = json.load(fh)
     variants[frag["variant"]] = frag["entry"]
+    fresh += 1
 
-if not variants:
+if fresh == 0:
     raise SystemExit("merge_manifest: no fragments found under frag/")
+if not variants:
+    raise SystemExit("merge_manifest: no variants to write")
 
 manifest = {
     "repository": f"https://github.com/{repo}",
@@ -42,7 +54,7 @@ manifest = {
     },
 }
 
-with open("assets/manifest.json", "w") as fh:
-    json.dump(manifest, fh, indent=2)
+with open("assets/manifest.json", "w", encoding="utf-8") as fh:
+    json.dump(manifest, fh, indent=2, ensure_ascii=False)
     fh.write("\n")
-print(json.dumps(manifest, indent=2))
+print(json.dumps(manifest, indent=2, ensure_ascii=False))
