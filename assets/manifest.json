@@ -25,8 +25,8 @@
           "type": "cpu",
           "cuda": null,
           "backend": "tf+jax+torch",
-          "url": "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cpu-Linux-x86_64.sh",
-          "sha256": "409baefc52e4f005809da863b35c975c316d6d3180664db8adf2273e3bc479a7"
+          "url": "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260624-8b1ad92-cpu-Linux-x86_64.sh",
+          "sha256": "93f32bd65cc454470d283ea33de341de5df7f2cb14a1e8fcafdf3bcd96d0ac4e"
         }
       }
     }
