@@ -23,6 +23,14 @@ bar: **every run succeeds, on any model** (`pass_rate = 100%`, variance = 0).
 | `verify_offline.sh` GPU mode (auto from `*cuda*` filename) | Adds `nvidia-smi`, TF GPU visibility, and a `jit_compile=True` XLA op that proves the libdevice-hack works. Must run on a GPU node. |
 | New `scripts/build_pkg_from_commit.sh` (Stage 1) + `construct.yaml` `DEEPMD_LOCAL_CHANNEL`/`DEEPMD_BUILD` + `build.sh --from-commit-channel` (Stage 2) | Commit packaging: no per-commit conda package exists, so build the commit from source into a local channel first, then constructor bundles that exact build. |
 
+### Round 3 (mentor: one-line install + nightly + multi-CUDA)
+| Fix | Why |
+| --- | --- |
+| `dpack` package manager + `install.sh` bootstrap | One-line install like dp1s/pixi: `dpack install dp` (online, auto-detect CUDA, download split parts → reassemble → sha256 → install) or `--file` (offline). Installs to user dir, no root. |
+| `.github/workflows/nightly.yml` | PyTorch-style daily CI building CPU + CUDA variants → Release. |
+| Version-aware CUDA guard in `build.sh` + libdevice fix (pin `py_5` + `cuda-nvvm` + post_install symlink self-heal) | Resolved the TF-backend libdevice JIT failure; guard fails fast when a requested `cudaXXX` build doesn't exist on conda-forge. |
+| Multi-CUDA resolved | conda-forge ships one `cudaXXX` build per deepmd release; the 3.2.0b0 `cuda129` build covers the whole CUDA 12.x + 13.0 driver line via NVIDIA minor-version compatibility. 12.8/13.1 were never published upstream. Full evidence in `references/verification-log.md`. |
+
 ## The acceptance flow (run in this order)
 
 ### 1. On a Linux build machine WITH internet
@@ -69,10 +77,16 @@ Want: `agent pass_rate = 100%` on ≥2 models.
 - [ ] versions pinned in `construct.yaml` (from `freeze.sh`); not building off `deepmd-kit_rc`
 - [ ] `dist/*.lock.txt` committed as the reproducibility record
 
+## Verification status
+The full pipeline has been **run end-to-end on Bohrium** (Tesla V100, driver
+CUDA 13.0): dpack online + offline install, CPU + GPU builds, PyTorch and
+TensorFlow backends, dp train → freeze → lammps, across ubuntu22.04 and
+ubuntu24.04 images, plus the multi-CUDA (12.6 + 12.9) GPU checks. Detailed
+records, commands, and findings are in `references/verification-log.md`.
+
 ## Known limits / honest gaps
-- This was edited on Windows with no network — the scripts are **syntax-checked
-  but not run**. The actual constructor build + offline verify must run on a
-  Linux box (constructor installers are `Linux-x86_64`).
+- Builds are `Linux-x86_64` only; the constructor build + offline verify must run
+  on Linux (a build can run on a GPU-less node, but GPU verify needs a GPU host).
 - CUDA offline-verify needs a GPU host with an NVIDIA driver; on a CPU-only box
   the GPU smoke tests fail by design — run them on a Bohrium GPU node.
 - GLIBC ≥ 2.17 is required on any target machine.
