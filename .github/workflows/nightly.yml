@@ -104,15 +104,19 @@ jobs:
             ${CUDA_FLAG} ${{ matrix.split }} \
             --backend all --torch-version ">=2.5"
           echo "=== built artifacts ==="
-          find dist -type f \( -name '*.sh' -o -name '*.sh.[0-9]*' \) -exec ls -lh {} \;
+          # Match ONLY the final installer(s); the constructor cache under
+          # dist/<variant>/cache/ holds unrelated package scripts (e.g.
+          # install-libstdc++.sh) that must not be uploaded.
+          find dist -type f \( -name 'deepmd-kit-*.sh' -o -name 'deepmd-kit-*.sh.[0-9]*' \) -exec ls -lh {} \;
 
       - name: Upload installer to the Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v$(cat assets/version.txt)"
-          mapfile -t files < <(find dist -type f \( -name '*.sh' -o -name '*.sh.[0-9]*' \))
+          mapfile -t files < <(find dist -type f \( -name 'deepmd-kit-*.sh' -o -name 'deepmd-kit-*.sh.[0-9]*' \))
           [ ${#files[@]} -gt 0 ] || { echo "no installer to upload"; exit 1; }
+          printf 'uploading: %s\n' "${files[@]}"
           gh release upload "$TAG" "${files[@]}" --clobber
 
       - name: Emit manifest fragment

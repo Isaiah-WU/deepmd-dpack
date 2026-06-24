@@ -39,8 +39,10 @@ def sha256_of(paths):
     return h.hexdigest()
 
 
-parts = sorted(glob.glob(f"dist/{subdir}/*.sh.[0-9]*"))
-singles = [p for p in glob.glob(f"dist/{subdir}/*.sh") if not p.endswith(tuple(f".sh.{i}" for i in range(10)))]
+# Match only the final installer(s); the constructor cache holds unrelated
+# *.sh scripts. Installers are named deepmd-kit-<ver>-<variant>-Linux-x86_64.sh.
+parts = sorted(glob.glob(f"dist/{subdir}/deepmd-kit-*.sh.[0-9]*"))
+singles = glob.glob(f"dist/{subdir}/deepmd-kit-*.sh")
 
 entry = {"type": "gpu" if cuda else "cpu", "cuda": cuda or None, "backend": "tf+jax+torch"}
 if cuda:
