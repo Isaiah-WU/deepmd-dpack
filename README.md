@@ -126,6 +126,8 @@ deepmd-dpack/
 
 ### 自动发布闭环（nightly.yml）
 
+**每天 UTC 02:17（北京时间 10:17）自动运行**（也会在 `construct.yaml` / `version.txt` / `build.sh` 改动推送时触发）：
+
 ```
 构建(cpu + cuda129) → 创建/更新 GitHub Release → 上传安装包（GPU 自动分片）
                     → 重生 assets/manifest.json → 提交回 main
@@ -260,7 +262,8 @@ bash scripts/build.sh --cuda 12.9     # GPU build (covers 12.x~13.0 drivers)
 bash scripts/verify_offline.sh dist/*/*.sh $(cat assets/version.txt)
 ```
 
-The nightly pipeline (`nightly.yml`) builds cpu + cuda129 → creates/updates a GitHub Release →
+The nightly pipeline (`nightly.yml`) runs **daily at 02:17 UTC** (and on pushes touching
+`construct.yaml` / `version.txt` / `build.sh`): it builds cpu + cuda129 → creates/updates a GitHub Release →
 uploads installers (GPU auto-split) → regenerates `assets/manifest.json` → commits it back. Trigger
 manually via `Actions → Nightly Build & Publish → Run workflow` (`variant`: cpu / cuda129 / all).
 
