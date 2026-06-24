@@ -117,7 +117,14 @@ if [[ -n "$COMMIT_CHANNEL" ]]; then
   echo "    pinned version=$VERSION build=${DEEPMD_BUILD:-<variant>} py=${DEEPMD_PY_VERSION:-?} cuda=${CUDA_VERSION:-CPU}"
 fi
 
-export VERSION CUDA_VERSION DEEPMD_BUILD DEEPMD_LOCAL_CHANNEL DEEPMD_PY_VERSION DP_BACKEND TORCH_VERSION TARGET_GLIBC
+# --- PyTorch-nightly-style naming: <version>-<YYYYMMDD>-<7hash>-<variant> -------
+# Date = build day; hash = this repo's short commit (build provenance; becomes the
+# deepmd master commit once we build from source). Both overridable via env.
+BUILD_DATE="${BUILD_DATE:-$(date +%Y%m%d)}"
+if [[ -z "${BUILD_HASH:-}" ]]; then
+  BUILD_HASH="$(git rev-parse HEAD 2>/dev/null | cut -c1-7)"
+fi
+export VERSION CUDA_VERSION DEEPMD_BUILD DEEPMD_LOCAL_CHANNEL DEEPMD_PY_VERSION DP_BACKEND TORCH_VERSION TARGET_GLIBC BUILD_DATE BUILD_HASH
 
 # --- GPU build needs virtual-package overrides so a GPU-LESS build node can
 #     solve+download the CUDA variant (matches upstream installer CI) ----------
@@ -191,6 +198,7 @@ mkdir -p "$OUTPUT_DIR"
 echo "==> Build parameters"
 echo "    recipe dir : $RECIPE_DIR"
 echo "    version    : $VERSION"
+echo "    date+hash  : ${BUILD_DATE:-?}-${BUILD_HASH:-(no git)}"
 echo "    variant    : ${CUDA_VERSION:+CUDA $CUDA_VERSION}${CUDA_VERSION:-CPU}"
 if [[ -n "$DEEPMD_BUILD" ]];         then echo "    pinned build : $DEEPMD_BUILD"; fi
 if [[ -n "$DEEPMD_PY_VERSION" ]];    then echo "    pinned python: $DEEPMD_PY_VERSION"; fi

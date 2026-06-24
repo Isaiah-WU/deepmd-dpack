@@ -7,6 +7,8 @@
 {% set local_channel = os.environ.get("DEEPMD_LOCAL_CHANNEL", "") %}
 {% set build_string = os.environ.get("DEEPMD_BUILD", "") %}
 {% set py_version = os.environ.get("DEEPMD_PY_VERSION", "") %}
+{% set build_date = os.environ.get("BUILD_DATE", "") %}
+{% set build_hash = os.environ.get("BUILD_HASH", "") %}
 {% set with_tf = backend in ("all","tensorflow") %}
 {% set with_pt = backend in ("all","pytorch") and torch_version %}
 {% set with_jax = backend in ("all","jax") %}
@@ -19,7 +21,13 @@
 {% endif %}
 
 name: deepmd-kit
+# PyTorch-nightly-style name when date+hash are provided (set by build.sh):
+#   deepmd-kit-<version>-<YYYYMMDD>-<7-char hash>-<variant>-Linux-x86_64.sh
+{% if build_date and build_hash %}
+version: {{ version }}-{{ build_date }}-{{ build_hash }}-{{ variant_version }}
+{% else %}
 version: {{ version }}-{{ variant_version }}
+{% endif %}
 
 channels:
 {% if local_channel %}

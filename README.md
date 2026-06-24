@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/Isaiah-WU/deepmd-dpack/main/install
 dpack install dp
 
 # 断网机器（超算）：先手动把离线包拷过去，再指向本地文件
-dpack install dp --file ./deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh
+dpack install dp --file ./deepmd-kit-3.2.0b0-20260624-a1b2c3d-cuda129-Linux-x86_64.sh
 
 # 装完按提示激活即可
 source <安装路径>/bin/activate <安装路径>
@@ -180,7 +180,7 @@ If `dpack` isn't found, run `export PATH="$HOME/.local/bin:$PATH"` or open a new
 dpack install dp
 
 # Air-gapped (HPC): copy the offline package over, then point at the local file
-dpack install dp --file ./deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh
+dpack install dp --file ./deepmd-kit-3.2.0b0-20260624-a1b2c3d-cuda129-Linux-x86_64.sh
 
 # Activate as printed, then:
 source <prefix>/bin/activate <prefix>
