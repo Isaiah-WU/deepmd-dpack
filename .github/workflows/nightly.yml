@@ -1,43 +1,74 @@
-name: Nightly Build
+name: Nightly Build & Publish
 
-# PyTorch-style automated nightly builds for DeePMD-kit offline installers.
-# Builds multiple CUDA variants in parallel, uploads artifacts, updates manifest.
+# PyTorch-style daily pipeline:
+#   build offline installers (CPU + CUDA) -> publish to a GitHub Release ->
+#   regenerate assets/manifest.json -> commit it back.
+# dpack then reads manifest.json and installs the right build per machine.
 
 on:
   schedule:
-    - cron: '17 2 * * *'    # daily at 2:17 UTC (off-peak, avoids :00/:30 thundering herd)
+    - cron: '17 2 * * *'    # daily at 02:17 UTC (off-peak)
   push:
     branches: [main]
     paths:
       - 'assets/construct.yaml'
       - 'assets/version.txt'
       - 'scripts/build.sh'
-  workflow_dispatch:         # manual trigger from GitHub Actions UI
+  workflow_dispatch:
+
+permissions:
+  contents: write          # create releases + commit the regenerated manifest
+
+defaults:
+  run:
+    shell: bash -el {0}    # login shell so `conda activate` works
 
 jobs:
-  build:
+  # 1) Create the Release once (avoids a race when matrix jobs upload in parallel).
+  prepare:
+    name: Prepare release
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(cat assets/version.txt)"
+          TAG="v${VERSION}"
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" \
+              --title "DeePMD-kit ${VERSION} offline installers" \
+              --notes "Auto-published by nightly CI. Use dpack to install: \`dpack install dp\`."
+
+  # 2) Build each variant, upload to the Release, emit a manifest fragment.
+  build:
     name: Build ${{ matrix.label }}
+    needs: prepare
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - label: CPU
+          - label: cpu
             cuda: ''
-          - label: CUDA 12.9
+            split: ''
+          - label: cuda129
             cuda: '12.9'
-          # Only cuda129 is buildable from conda-forge today. The published
-          # deepmd-kit cuda129 build hard-pins `cuda-version >=12.9,<13`, so
-          # --cuda 12.6/12.8 fail to solve; by NVIDIA minor-version
-          # compatibility the single cuda129 package already covers the whole
-          # CUDA 12.x driver line + 13.0. CUDA 13.1 is a different major and is
-          # blocked until conda-forge publishes a cuda13 TF/PyTorch/deepmd stack.
-          # Re-enable per-minor rows only if upstream adds those builds:
-          # - label: CUDA 13.1
-          #   cuda: '13.1'
-
+            split: '--split 3'   # GPU .sh > GitHub's 2 GiB per-asset limit
+          # Only cuda129 is buildable from conda-forge today (one cudaXXX build
+          # per deepmd release; it covers the whole 12.x driver line via NVIDIA
+          # minor-version compatibility). See references/verification-log.md.
     steps:
       - uses: actions/checkout@v4
+
+      - name: Free disk space (GPU build is large)
+        if: matrix.cuda != ''
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          large-packages: false
+          docker-images: false
 
       - uses: conda-incubator/setup-miniconda@v3
         with:
@@ -45,51 +76,77 @@ jobs:
           auto-update-conda: true
 
       - name: Install constructor
-        run: conda install constructor conda-libmamba-solver -y
+        run: conda install -n base constructor conda-libmamba-solver -y
 
       - name: Build offline installer
-        run: |
-          mkdir -p dist
-          bash scripts/build.sh \
-            --version $(cat assets/version.txt) \
-            ${CUDA_FLAG} \
-            --backend all \
-            --torch-version ">=2.5"
         env:
           CUDA_FLAG: ${{ matrix.cuda && format('--cuda {0}', matrix.cuda) || '' }}
-
-      - name: Show artifacts
         run: |
-          echo "=== Built installers ==="
-          find dist/ -name "*.sh" -exec ls -lh {} \;
-          echo "=== Manifest ==="
-          cat dist/*/manifest-*.txt 2>/dev/null || true
+          bash scripts/build.sh \
+            --version "$(cat assets/version.txt)" \
+            ${CUDA_FLAG} ${{ matrix.split }} \
+            --backend all --torch-version ">=2.5"
+          echo "=== built artifacts ==="
+          find dist -type f \( -name '*.sh' -o -name '*.sh.[0-9]*' \) -exec ls -lh {} \;
 
-      - name: Upload artifact
+      - name: Upload installer to the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v$(cat assets/version.txt)"
+          mapfile -t files < <(find dist -type f \( -name '*.sh' -o -name '*.sh.[0-9]*' \))
+          [ ${#files[@]} -gt 0 ] || { echo "no installer to upload"; exit 1; }
+          gh release upload "$TAG" "${files[@]}" --clobber
+
+      - name: Emit manifest fragment
+        env:
+          REPO: ${{ github.repository }}
+          CUDA: ${{ matrix.cuda }}
+        run: python scripts/gen_manifest_fragment.py
+
+      - name: Upload fragment artifact
         uses: actions/upload-artifact@v4
         with:
-          name: deepmd-kit-${{ matrix.label == 'CPU' && 'cpu' || format('cuda{0}', matrix.cuda) }}
-          path: dist/*/deepmd-kit-*.sh
-          retention-days: 30
+          name: manifest-fragment-${{ matrix.label }}
+          path: frag/*.json
+          retention-days: 7
 
-  update-manifest:
-    name: Update manifest.json
-    needs: [build]
+  # 3) Merge fragments -> assets/manifest.json -> commit back to main.
+  publish-manifest:
+    name: Publish manifest.json
+    needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Commit updated manifest
+      - name: Download all fragments
+        uses: actions/download-artifact@v4
+        with:
+          pattern: manifest-fragment-*
+          path: frag
+          merge-multiple: true
+
+      - name: Regenerate manifest.json
+        env:
+          REPO: ${{ github.repository }}
+        run: python scripts/merge_manifest.py
+
+      - name: Commit manifest if changed
         run: |
-          DATE=$(date +%Y%m%d)
-          SHORT_SHA=$(git rev-parse --short=7 HEAD)
-          echo "Nightly $DATE @ $SHORT_SHA — artifacts at:"
-          echo "  https://github.com/Isaiah-WU/deepmd-offline-installer-skill/actions/runs/${{ github.run_id }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add assets/manifest.json
+          if git diff --cached --quiet; then
+            echo "manifest unchanged"
+          else
+            git commit -m "ci: update manifest.json from nightly publish [skip ci]"
+            git push
+          fi
 
   pass:
     name: Pass
-    needs: [build, update-manifest]
+    needs: [build, publish-manifest]
     runs-on: ubuntu-latest
     if: always()
     steps:

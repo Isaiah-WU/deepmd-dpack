@@ -1,50 +1,25 @@
 {
-  "repository": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill",
-  "manifest_url": "https://raw.githubusercontent.com/Isaiah-WU/deepmd-offline-installer-skill/main/assets/manifest.json",
+  "repository": "https://github.com/Isaiah-WU/dpack",
+  "manifest_url": "https://raw.githubusercontent.com/Isaiah-WU/dpack/main/assets/manifest.json",
+  "_comment": "Auto-generated/updated by .github/workflows/nightly.yml after each publish. Only lists variants actually built and uploaded to the Release.",
   "tools": {
     "dp": {
       "name": "DeePMD-kit",
       "description": "Deep Potential Molecular Dynamics — neural network interatomic potential",
       "homepage": "https://github.com/deepmodeling/deepmd-kit",
+      "version": "3.2.0b0",
       "variants": {
-        "cuda126": {
-          "type": "gpu",
-          "cuda": "12.6",
-          "backend": "tf+jax+torch",
-          "url": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda126-Linux-x86_64.sh",
-          "sha256": ""
-        },
-        "cuda128": {
-          "type": "gpu",
-          "cuda": "12.8",
-          "backend": "tf+jax+torch",
-          "url": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda128-Linux-x86_64.sh",
-          "sha256": ""
-        },
         "cuda129": {
           "type": "gpu",
           "cuda": "12.9",
           "backend": "tf+jax+torch",
+          "note": "Covers the CUDA 12.x ~ 13.0 driver line via NVIDIA minor-version compatibility.",
           "parts": [
-            "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh.0",
-            "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh.1",
-            "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh.2"
+            "https://github.com/Isaiah-WU/dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh.0",
+            "https://github.com/Isaiah-WU/dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh.1",
+            "https://github.com/Isaiah-WU/dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda129-Linux-x86_64.sh.2"
           ],
           "sha256": "0e8cec99e50d91392a98f5f370c9c7724142b6892b815d7612f50aa55ef47367"
-        },
-        "cuda131": {
-          "type": "gpu",
-          "cuda": "13.1",
-          "backend": "tf+jax+torch",
-          "url": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cuda131-Linux-x86_64.sh",
-          "sha256": ""
-        },
-        "cpu": {
-          "type": "cpu",
-          "cuda": null,
-          "backend": "tf+jax+torch",
-          "url": "https://github.com/Isaiah-WU/deepmd-offline-installer-skill/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-cpu-Linux-x86_64.sh",
-          "sha256": ""
         }
       }
     }

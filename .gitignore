@@ -1,0 +1,7 @@
+# Build outputs and CI scratch
+dist/
+frag/
+
+# Python
+__pycache__/
+*.pyc

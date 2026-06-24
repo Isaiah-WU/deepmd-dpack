@@ -35,7 +35,7 @@ bar: **every run succeeds, on any model** (`pass_rate = 100%`, variance = 0).
 
 ### 1. On a Linux build machine WITH internet
 ```bash
-cd deepmd-offline-installer-skill
+cd dpack
 bash scripts/build.sh --version 3.1.3            # CPU
 bash scripts/verify_offline.sh dist/*.sh 3.1.3   # proves offline install works
 bash scripts/freeze.sh dist/*.sh                 # capture exact pins -> dist/*.lock.txt

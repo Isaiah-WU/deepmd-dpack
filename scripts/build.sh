@@ -59,6 +59,7 @@ else
   OUT_SUBDIR="cpu"
 fi
 OUTPUT_DIR="$(pwd)/dist/${OUT_SUBDIR}"
+OUTPUT_DIR_EXPLICIT=0   # set to 1 only when --output-dir is passed
 COMMIT_CHANNEL=""
 SPLIT_PARTS=""
 DEEPMD_BUILD="${DEEPMD_BUILD:-}"
@@ -86,7 +87,7 @@ while [[ $# -gt 0 ]]; do
     --example)                EXAMPLE="$2"; shift 2 ;;
     --from-commit-channel)    COMMIT_CHANNEL="$2"; shift 2 ;;
     -r|--recipe-dir)          RECIPE_DIR="$2"; shift 2 ;;
-    -o|--output-dir)          OUTPUT_DIR="$2"; shift 2 ;;
+    -o|--output-dir)          OUTPUT_DIR="$2"; OUTPUT_DIR_EXPLICIT=1; shift 2 ;;
     --split)                  SPLIT_PARTS="$2"; shift 2 ;;
     -h|--help)                usage; exit 0 ;;
     -*)                       echo "ERROR: unknown option: $1" >&2; usage; exit 2 ;;
@@ -175,6 +176,14 @@ fi
 if [[ -n "$CUDA_VERSION" && -z "$SPLIT_PARTS" ]]; then
   echo "    NOTE: GPU installers are often >2GiB (GitHub's per-asset limit). To ship via" >&2
   echo "          GitHub Releases, re-run with --split 3 (local verify works unsplit)." >&2
+fi
+
+# OUTPUT_DIR's default subdir depends on the FINAL cuda version, but args are parsed
+# after the early default at the top — so recompute here unless --output-dir was given.
+# This keeps GPU builds in dist/cuda<NNN>/ (not dist/cpu/).
+if [[ "$OUTPUT_DIR_EXPLICIT" == 0 ]]; then
+  if [[ -n "$CUDA_VERSION" ]]; then OUT_SUBDIR="cuda${CUDA_VERSION//./}"; else OUT_SUBDIR="cpu"; fi
+  OUTPUT_DIR="$(pwd)/dist/${OUT_SUBDIR}"
 fi
 
 mkdir -p "$OUTPUT_DIR"
