@@ -152,9 +152,28 @@ jobs:
           gh release upload "$TAG" "${parts[@]}" --clobber
           printf 'uploaded: %s\n' "${parts[@]}"
 
+  prune:
+    name: Prune old nightly assets
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write            # 删旧资产;此任务【不跑 pip】,故写 token 安全
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Prune (keep latest N per variant + never delete manifest-referenced)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_BUILDS: '2'
+        run: |
+          # 安全上线:默认 dry-run(只打印)。确认几晚日志无误后,把仓库变量 PRUNE_APPLY 设为 true 才真删。
+          python scripts/prune_release_assets.py ${{ vars.PRUNE_APPLY == 'true' && '--apply' || '' }}
+
   pass:
     name: Pass
-    needs: [build]
+    needs: [build, prune]
     runs-on: ubuntu-latest
     if: always()
     steps:

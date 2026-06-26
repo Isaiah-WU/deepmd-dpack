@@ -20,7 +20,9 @@ set -euo pipefail
 REPO="${REPO:-Isaiah-WU/deepmd-dpack}"
 VARIANTS="${VARIANTS:-}"            # 空=自动发现 release 上所有 cudaXXX/cpu 变体
 WORK="${WORK:-/tmp/verify-publish}"
-: "${GH_PAT:?需要细粒度 PAT(对 $REPO Contents:write);只在最后 push 用}"
+DRY_RUN="${DRY_RUN:-0}"            # 1=只下载+GPU验证+算 manifest 差异,不提交不 push(无需 PAT)
+# DRY_RUN 时全程匿名,不需要 token;只有真发布才需要 GH_PAT。
+[ "$DRY_RUN" = "1" ] || : "${GH_PAT:?需要细粒度 PAT(对 $REPO Contents:write);只在最后 push 用。或设 DRY_RUN=1 先空跑}"
 PY="$(command -v python3 || command -v python || true)"; : "${PY:?需要 python}"
 command -v conda >/dev/null || { echo "需要 conda"; exit 1; }
 
@@ -126,9 +128,19 @@ if [ ${#PASS[@]} -eq 0 ]; then
   echo "本轮无变体通过 GPU 验证,manifest 未变"; exit 0
 fi
 
-echo "==> 合并通过的片段 → manifest.json → commit → push(仅此步用 token)"
+echo "==> 合并通过的片段 → manifest.json"
 cd "$SKILL"
 "$PY" scripts/merge_manifest.py
+
+if [ "$DRY_RUN" = "1" ]; then
+  echo ""
+  echo "===== DRY_RUN:不提交、不 push。manifest 将会变成(diff)====="
+  git --no-pager diff -- assets/manifest.json || true
+  echo "===== DRY_RUN 结束;GPU 验证通过的变体:${PASS[*]} ====="
+  exit 0
+fi
+
+echo "==> commit → push(仅此步用 token)"
 git config user.name  "bohrium-verify[bot]"
 git config user.email "bohrium-verify@users.noreply.github.com"
 git add assets/manifest.json
