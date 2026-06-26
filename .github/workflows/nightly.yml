@@ -82,16 +82,20 @@ jobs:
       contents: write            # 仅此任务(不跑 pip):确保 release 存在
     steps:
       - uses: actions/checkout@v4
-      - name: Ensure rolling nightly release exists
+      - name: Ensure & sync rolling nightly release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # 单一滚动通道(对照 PyTorch /whl/nightly):一个 nightly release 滚动存放
           # 所有变体的最新日期构建;版本写在文件名里,不在 tag 上。
-          gh release view nightly >/dev/null 2>&1 || \
-            gh release create nightly --prerelease \
-              --title "DeePMD-kit nightly (rolling, GPU-verified channel)" \
-              --notes "CI 每日自动构建的离线安装包(滚动)。GPU 验证在玻尔外部进行;dpack 只安装 manifest 收录(已 GPU 验证)的变体。"
+          # 每次都同步标题/说明(诚实提示:本页资产可能未经 GPU 验证,请用 dpack 安装)。
+          TITLE="DeePMD-kit nightly installers (rolling channel)"
+          NOTES="每日 CI 自动构建的离线安装包(滚动)。**请用 dpack 安装——它只安装通过 GPU 验证的变体(见 manifest.json)。** 本页资产为 CI 构建、可能尚未通过 GPU 验证,直接下载请自负风险。GPU 验证在玻尔外部进行。"
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release edit nightly --prerelease --title "$TITLE" --notes "$NOTES"
+          else
+            gh release create nightly --prerelease --title "$TITLE" --notes "$NOTES"
+          fi
 
   build:
     name: Build ${{ matrix.label }}
