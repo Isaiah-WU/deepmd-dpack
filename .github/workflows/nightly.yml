@@ -96,6 +96,9 @@ jobs:
   build:
     name: Build ${{ matrix.label }}
     needs: [setup, prepare, resolve]
+    # 变了才构建:定时跑时,只有 PyPI 出现比【已发布】更新的 deepmd 才构建;
+    # 手动 workflow_dispatch 永远强制构建(迁移/测试用)。版本没变 → 本 job 跳过,零 GPU/零成本。
+    if: needs.resolve.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # 注意:此任务运行 pip --pre(第三方代码)并需要 contents:write 来上传 release 资产。
     # 安全前提(见仓库 SECURITY 说明):main 应开启分支保护(禁止直接 push),使该 token 无法

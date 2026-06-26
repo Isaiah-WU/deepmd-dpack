@@ -88,6 +88,26 @@ PY
   [ -n "$BASE" ] || { echo "  release 上没有 $V 的分片,跳过"; continue; }
   echo "  最新构建: $BASE  ($(printf '%s' "$NAMES" | wc -w) 片, 期望 ${TOTAL}B)"
 
+  # 变了才验:若该变体在 release 上的最新构建,已经是 manifest 当前发布的那一份,
+  # 就跳过——不下载、不安装、不碰 GPU。(所有变体都跳 → 本轮根本不开 GPU。)
+  pub="$(BASE="$BASE" MV="$V" "$PY" - "$SKILL/assets/manifest.json" <<'PY'
+import json, os, sys
+base, v = os.environ["BASE"], os.environ["MV"]
+try:
+    m = json.load(open(sys.argv[1]))
+except Exception:
+    print("no"); sys.exit()
+ent = m.get("tools", {}).get("dp", {}).get("variants", {}).get(v, {})
+urls = ent.get("parts") or ([ent["url"]] if ent.get("url") else [])
+names = [u.rsplit("/", 1)[-1] for u in urls]
+print("yes" if any(n == base or n.startswith(base + ".") for n in names) else "no")
+PY
+)"
+  if [ "$pub" = "yes" ]; then
+    echo "  $V 已是 manifest 当前发布版,跳过(无需 GPU)"
+    continue
+  fi
+
   d="$WORK/$V"; rm -rf "$d"; mkdir -p "$d"; cd "$d"
   for name in $NAMES; do
     curl -fsSL -o "$name" "https://github.com/${REPO}/releases/download/${TAG}/${name}"
@@ -125,7 +145,7 @@ PY
 done
 
 if [ ${#PASS[@]} -eq 0 ]; then
-  echo "本轮无变体通过 GPU 验证,manifest 未变"; exit 0
+  echo "本轮没有需要发布的变体(已发布的跳过 / 未通过的保留原条目),manifest 未变"; exit 0
 fi
 
 echo "==> 合并通过的片段 → manifest.json"

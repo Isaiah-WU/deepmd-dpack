@@ -81,12 +81,20 @@ if not cands:
 
 latest = str(max(cands))
 
+# "当前" = dpack 现在实际发布给用户的版本 = manifest 顶层 version(由验证道写)。
+# 跟它比,而不是 version.txt —— 只有出现比【已发布】更新的 deepmd 才构建。manifest 读不到时回退 version.txt。
 cur = ""
 try:
-    with open("assets/version.txt", encoding="utf-8") as fh:
-        cur = fh.read().strip()
-except FileNotFoundError:
-    pass
+    with open("assets/manifest.json", encoding="utf-8") as fh:
+        cur = json.load(fh).get("tools", {}).get("dp", {}).get("version", "").strip()
+except (FileNotFoundError, json.JSONDecodeError, ValueError):
+    cur = ""
+if not cur:
+    try:
+        with open("assets/version.txt", encoding="utf-8") as fh:
+            cur = fh.read().strip()
+    except FileNotFoundError:
+        pass
 
 # 不降级:若检测到的"最新"<= 当前(例如 PRERELEASE=0 选到比当前预发布更旧的正式版),保持当前。
 if cur:
@@ -116,7 +124,7 @@ for raw in reqs:
 warns = list(dict.fromkeys(warns))  # 去重(requires_dist 常有同名多 marker 条目)
 
 print(f"最新可装 deepmd-kit(prerelease={PRERELEASE}): {latest}")
-print(f"当前 version.txt: {cur or '(无)'}   changed={changed}")
+print(f"当前已发布(manifest): {cur or '(无)'}   changed={changed}")
 for w in warns:
     print("WARNING:", w)
 
