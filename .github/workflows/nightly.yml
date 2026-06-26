@@ -1,36 +1,39 @@
-name: Nightly Build & Publish
+name: Nightly Build (Mode C)
 
-# PyTorch-style daily pipeline:
-#   build offline installers (CPU + CUDA) -> publish to a GitHub Release ->
-#   regenerate assets/manifest.json -> commit it back.
-# dpack then reads manifest.json and installs the right build per machine.
+# 每天在 GitHub 的 CPU runner 上构建 Mode C 的 per-CUDA 离线包(cu126/cu128/cu130),
+# 上传到 GitHub Release(prerelease)。
+#
+# 【关键设计 — 真门】本工作流【不提交 manifest.json】。manifest 是 dpack 唯一读取的清单,
+# 只能由玻尔 GPU 验证道(scripts/verify_and_publish.sh)在 GPU 端到端(torch.cuda + train +
+# freeze + lammps)通过后才写入。这样发给用户的(manifest 收录的)永远是 GPU 验证过的变体。
+# GitHub runner 没有 GPU,只做"构建"(pip 装 + conda-pack,SKIP_GPU_CHECK 跳过 GPU 自检)。
+#
+# 【命名/不覆盖】产物名带当天日期(deepmd-kit-<ver>-<date>-<hash>-cudaXXX-...sh.N),所以每天的
+# 新构建是【新资产名】,不会覆盖 manifest 当前引用的(已验证)资产;玻尔验过后才把 manifest 指过去。
+#
+# Mode A 的 cpu/cuda129(conda constructor,完整 TF+JAX+PyTorch)不在本工作流;其 manifest 条目
+# 沿用现有。如需自动重建 cpu/cuda129,另开工作流或单独加。
 
 on:
   schedule:
-    - cron: '17 2 * * *'    # daily at 02:17 UTC (off-peak)
-  push:
-    branches: [main]
-    paths:
-      - 'assets/construct.yaml'
-      - 'assets/version.txt'
-      - 'scripts/build.sh'
+    - cron: '17 2 * * *'          # 每天 02:17 UTC
   workflow_dispatch:
     inputs:
       variant:
-        description: 'Which variant(s) to build (use "cpu" for a fast, low-risk first test)'
+        description: '构建哪个变体(首次测试建议先单个,如 cu126)'
         type: choice
-        options: [all, cpu, cuda129]
+        options: [all, cu126, cu128, cu130]
         default: all
 
+# 最小权限:顶层只读。
 permissions:
-  contents: write          # create releases + commit the regenerated manifest
+  contents: read
 
 defaults:
   run:
-    shell: bash -el {0}    # login shell so `conda activate` works
+    shell: bash -el {0}           # 登录 shell,conda activate 可用
 
 jobs:
-  # 0) Decide which variants to build (manual runs can pick cpu / cuda129 / all).
   setup:
     name: Select variants
     runs-on: ubuntu-latest
@@ -40,150 +43,93 @@ jobs:
       - id: m
         run: |
           V="${{ github.event.inputs.variant || 'all' }}"
-          CPU='{"label":"cpu","cuda":"","split":""}'
-          GPU='{"label":"cuda129","cuda":"12.9","split":"--split 3"}'
+          A='{"label":"cuda126","cu":"cu126","cuda":"12.6"}'
+          B='{"label":"cuda128","cu":"cu128","cuda":"12.8"}'
+          C='{"label":"cuda130","cu":"cu130","cuda":"13.0"}'
           case "$V" in
-            cpu)     echo "matrix={\"include\":[$CPU]}" >> "$GITHUB_OUTPUT" ;;
-            cuda129) echo "matrix={\"include\":[$GPU]}" >> "$GITHUB_OUTPUT" ;;
-            *)       echo "matrix={\"include\":[$CPU,$GPU]}" >> "$GITHUB_OUTPUT" ;;
+            cu126) M="[$A]" ;;
+            cu128) M="[$B]" ;;
+            cu130) M="[$C]" ;;
+            *)     M="[$A,$B,$C]" ;;
           esac
+          echo "matrix={\"include\":$M}" >> "$GITHUB_OUTPUT"
 
-  # 1) Create the Release once (avoids a race when matrix jobs upload in parallel).
   prepare:
-    name: Prepare release
+    name: Ensure release exists
     runs-on: ubuntu-latest
+    permissions:
+      contents: write            # 仅此任务(不跑 pip):确保 release 存在
     steps:
       - uses: actions/checkout@v4
-      - name: Ensure release exists
+      - name: Ensure prerelease tag exists
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="$(cat assets/version.txt)"
-          TAG="v${VERSION}"
+          TAG="v$(cat assets/version.txt)"
           gh release view "$TAG" >/dev/null 2>&1 || \
-            gh release create "$TAG" \
-              --title "DeePMD-kit ${VERSION} offline installers" \
-              --notes "Auto-published by nightly CI. Use dpack to install: \`dpack install dp\`."
+            gh release create "$TAG" --prerelease \
+              --title "DeePMD-kit $(cat assets/version.txt) offline installers" \
+              --notes "CI 自动构建。GPU 验证在玻尔外部进行;dpack 只安装 manifest 收录(已 GPU 验证)的变体。"
 
-  # 2) Build each selected variant, upload to the Release, emit a manifest fragment.
   build:
     name: Build ${{ matrix.label }}
     needs: [setup, prepare]
     runs-on: ubuntu-latest
+    # 注意:此任务运行 pip --pre(第三方代码)并需要 contents:write 来上传 release 资产。
+    # 安全前提(见仓库 SECURITY 说明):main 应开启分支保护(禁止直接 push),使该 token 无法
+    # 把代码推到 main;且本工作流无 pull_request 触发,fork 无法触达。依赖均钉精确版本。
+    permissions:
+      contents: write
     strategy:
-      fail-fast: false
-      # Only cuda129 is buildable from conda-forge today (one cudaXXX build per
-      # deepmd release; it covers the whole 12.x driver line via NVIDIA
-      # minor-version compatibility). See references/verification-log.md.
+      fail-fast: false           # 一个变体磁盘/网络抖动不连累其它
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Free disk space (GPU build is large)
-        if: matrix.cuda != ''
+      - name: Free disk space (Mode C 峰值 ~14-28G)
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: true
-          large-packages: false
-          docker-images: false
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Disk tripwire
+        run: |
+          free=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
+          echo "free on / : ${free}G"
+          [ "$free" -ge 35 ] || { echo "可用磁盘 <35G,可能放不下 Mode C 构建"; exit 1; }
 
       - uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: '3.11'
           auto-update-conda: true
 
-      - name: Install constructor
-        run: conda install -n base constructor conda-libmamba-solver -y
-
-      - name: Build offline installer
-        env:
-          CUDA_FLAG: ${{ matrix.cuda && format('--cuda {0}', matrix.cuda) || '' }}
+      - name: Build (Mode C, SKIP_GPU_CHECK)
         run: |
-          bash scripts/build.sh \
-            --version "$(cat assets/version.txt)" \
-            ${CUDA_FLAG} ${{ matrix.split }} \
-            --backend all --torch-version ">=2.5"
-          echo "=== built artifacts ==="
-          # Match ONLY the final installer(s); the constructor cache under
-          # dist/<variant>/cache/ holds unrelated package scripts (e.g.
-          # install-libstdc++.sh) that must not be uploaded.
-          find dist -type f \( -name 'deepmd-kit-*.sh' -o -name 'deepmd-kit-*.sh.[0-9]*' \) -exec ls -lh {} \;
+          export BUILD_HASH="$(git rev-parse --short HEAD)"
+          SKIP_GPU_CHECK=1 bash scripts/build_modec.sh "${{ matrix.cu }}"
+          mkdir -p "dist/${{ matrix.label }}"
+          mv /tmp/deepmd-kit-*-${{ matrix.label }}-Linux-x86_64.sh "dist/${{ matrix.label }}/"
+          # 切片(每个 GPU 包 >2GiB,GitHub 单资产 2GiB 上限),与消费端 split -a 1 -d -n 3 一致
+          ( cd "dist/${{ matrix.label }}" && f=$(ls deepmd-kit-*.sh) && split -a 1 -d -n 3 "$f" "$f." && rm -f "$f" )
+          ls -lh "dist/${{ matrix.label }}"
 
-      - name: Upload installer to the Release (keep only latest per variant)
+      - name: Upload date-stamped parts to release (do NOT clobber verified assets)
         env:
           GH_TOKEN: ${{ github.token }}
-          VARIANT: ${{ matrix.label }}
         run: |
           TAG="v$(cat assets/version.txt)"
-          # Keep-latest: delete any existing assets for THIS variant (old-named or
-          # earlier dates) before uploading the new dated build. The variant name
-          # sits right before '-Linux', so '-<variant>-Linux' is a precise anchor.
-          # cpu runs only touch cpu assets; cuda129 only cuda129 — no cross-delete.
-          gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null \
-            | grep -E "^deepmd-kit-.*-${VARIANT}-Linux" \
-            | while read -r a; do echo "removing old: $a"; gh release delete-asset "$TAG" "$a" -y; done || true
-          # A --split build leaves BOTH the parts (.0/.1/.2) and the original full
-          # .sh. Upload ONLY the parts when present (the full file is >2GiB and
-          # GitHub rejects it); otherwise upload the single .sh.
-          mapfile -t parts < <(find dist -type f -name 'deepmd-kit-*.sh.[0-9]*' | sort)
-          if [ ${#parts[@]} -gt 0 ]; then
-            files=("${parts[@]}")
-          else
-            mapfile -t files < <(find dist -type f -name 'deepmd-kit-*.sh')
-          fi
-          [ ${#files[@]} -gt 0 ] || { echo "no installer to upload"; exit 1; }
-          printf 'uploading: %s\n' "${files[@]}"
-          gh release upload "$TAG" "${files[@]}" --clobber
-
-      - name: Emit manifest fragment
-        env:
-          REPO: ${{ github.repository }}
-          CUDA: ${{ matrix.cuda }}
-        run: python scripts/gen_manifest_fragment.py
-
-      - name: Upload fragment artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: manifest-fragment-${{ matrix.label }}
-          path: frag/*.json
-          retention-days: 7
-
-  # 3) Merge fragments -> assets/manifest.json -> commit back to main.
-  publish-manifest:
-    name: Publish manifest.json
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all fragments
-        uses: actions/download-artifact@v4
-        with:
-          pattern: manifest-fragment-*
-          path: frag
-          merge-multiple: true
-
-      - name: Regenerate manifest.json
-        env:
-          REPO: ${{ github.repository }}
-        run: python scripts/merge_manifest.py
-
-      - name: Commit manifest if changed
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add assets/manifest.json
-          if git diff --cached --quiet; then
-            echo "manifest unchanged"
-          else
-            git commit -m "ci: update manifest.json from nightly publish [skip ci]"
-            git push
-          fi
+          # 不删旧资产:新构建是带当天日期的新文件名,不会覆盖 manifest 引用的(已验证)资产。
+          # --clobber 只在"同一天重跑、同名"时生效。
+          mapfile -t parts < <(ls dist/${{ matrix.label }}/deepmd-kit-*.sh.[0-9]*)
+          [ ${#parts[@]} -gt 0 ] || { echo "no parts produced"; exit 1; }
+          gh release upload "$TAG" "${parts[@]}" --clobber
+          printf 'uploaded: %s\n' "${parts[@]}"
 
   pass:
     name: Pass
-    needs: [build, publish-manifest]
+    needs: [build]
     runs-on: ubuntu-latest
     if: always()
     steps:
