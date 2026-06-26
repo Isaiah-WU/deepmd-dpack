@@ -28,16 +28,31 @@ except (FileNotFoundError, json.JSONDecodeError):
     variants = {}
 
 fresh = 0
+fresh_versions = []
 for f in sorted(glob.glob("frag/**/*.json", recursive=True)):
     with open(f, encoding="utf-8") as fh:
         frag = json.load(fh)
     variants[frag["variant"]] = frag["entry"]
+    if frag["entry"].get("version"):
+        fresh_versions.append(frag["entry"]["version"])
     fresh += 1
 
 if fresh == 0:
     raise SystemExit("merge_manifest: no fragments found under frag/")
 if not variants:
     raise SystemExit("merge_manifest: no variants to write")
+
+# Top-level version reflects the freshly-verified builds, NOT version.txt: the verify
+# lane only writes a fragment for a variant that PASSED GPU verification, so this never
+# advances manifest.version to a version that wasn't actually verified + published.
+if fresh_versions:
+    def _vkey(s):
+        try:
+            from packaging.version import Version
+            return Version(s)
+        except Exception:
+            return s
+    version = max(fresh_versions, key=_vkey)
 
 manifest = {
     "repository": f"https://github.com/{repo}",

@@ -16,6 +16,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import sys
 
 repo = os.environ.get("REPO", "Isaiah-WU/deepmd-dpack")
@@ -43,9 +44,18 @@ def sha256_of(paths):
 
 
 # Match only the final installer(s); the constructor cache holds unrelated
-# *.sh scripts. Installers are named deepmd-kit-<ver>-<variant>-Linux-x86_64.sh.
-parts = sorted(glob.glob(f"dist/{subdir}/deepmd-kit-*.sh.[0-9]*"))
+# *.sh scripts. Installers are named deepmd-kit-<ver>-<date>-<hash>-<variant>-Linux-x86_64.sh.
+# Sort parts NUMERICALLY by trailing .N (so .10 follows .2, not lexical order).
+parts = sorted(glob.glob(f"dist/{subdir}/deepmd-kit-*.sh.[0-9]*"),
+               key=lambda p: int(p.rsplit(".", 1)[-1]))
 singles = glob.glob(f"dist/{subdir}/deepmd-kit-*.sh")
+
+# Parse the REAL version + build date from the installer filename, so the manifest
+# self-describes the bytes actually built/verified (decoupled from version.txt).
+_first = os.path.basename((parts or singles or [""])[0])
+_m = re.match(r"deepmd-kit-(?P<ver>.+?)-(?P<date>\d{8})-", _first)
+file_version = _m.group("ver") if _m else version
+build_date = _m.group("date") if _m else ""
 
 # backend/note are env-driven so Mode A (cpu/cuda129) keeps tf+jax+torch while
 # Mode C (cuda126/128/130, set by the verify lane) reports pytorch + its own note.
@@ -67,6 +77,10 @@ elif singles:
     entry["sha256"] = sha256_of([f])
 else:
     sys.exit(f"gen_manifest_fragment: no installer found in dist/{subdir}/")
+
+entry["version"] = file_version
+if build_date:
+    entry["build_date"] = build_date
 
 os.makedirs("frag", exist_ok=True)
 out = {"variant": subdir, "entry": entry}

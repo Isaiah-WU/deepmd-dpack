@@ -54,6 +54,27 @@ jobs:
           esac
           echo "matrix={\"include\":$M}" >> "$GITHUB_OUTPUT"
 
+  resolve:
+    name: Resolve latest deepmd-kit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read             # 只读:检测 PyPI 最新版,不改仓库
+    outputs:
+      version: ${{ steps.r.outputs.version }}
+      changed: ${{ steps.r.outputs.changed }}
+      compat_warn: ${{ steps.r.outputs.compat_warn }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - id: r
+        env:
+          PRERELEASE: '1'          # 连 b/rc 一起追;改 '0' 只追正式版
+        run: |
+          pip install -q packaging
+          python scripts/detect_latest_deepmd.py
+
   prepare:
     name: Ensure release exists
     runs-on: ubuntu-latest
@@ -74,7 +95,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.label }}
-    needs: [setup, prepare]
+    needs: [setup, prepare, resolve]
     runs-on: ubuntu-latest
     # 注意:此任务运行 pip --pre(第三方代码)并需要 contents:write 来上传 release 资产。
     # 安全前提(见仓库 SECURITY 说明):main 应开启分支保护(禁止直接 push),使该 token 无法
@@ -107,8 +128,11 @@ jobs:
           auto-update-conda: true
 
       - name: Build (Mode C, SKIP_GPU_CHECK)
+        env:
+          DEEPMD_VER: ${{ needs.resolve.outputs.version }}   # 追最新:用 resolve 解析出的版本
         run: |
           export BUILD_HASH="$(git rev-parse --short HEAD)"
+          echo "构建 deepmd-kit ${DEEPMD_VER}  (compat_warn=${{ needs.resolve.outputs.compat_warn }})"
           SKIP_GPU_CHECK=1 bash scripts/build_modec.sh "${{ matrix.cu }}"
           mkdir -p "dist/${{ matrix.label }}"
           mv /tmp/deepmd-kit-*-${{ matrix.label }}-Linux-x86_64.sh "dist/${{ matrix.label }}/"
