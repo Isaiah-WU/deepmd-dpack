@@ -15,11 +15,11 @@
           "backend": "tf+jax+torch",
           "note": "Covers the CUDA 12.x ~ 13.0 driver line via NVIDIA minor-version compatibility.",
           "parts": [
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda129-Linux-x86_64.sh.0",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda129-Linux-x86_64.sh.1",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda129-Linux-x86_64.sh.2"
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-db57d49-cuda129-Linux-x86_64.sh.0",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-db57d49-cuda129-Linux-x86_64.sh.1",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-db57d49-cuda129-Linux-x86_64.sh.2"
           ],
-          "sha256": "40d470456fed539be5b2a29c9623082123bf638bca8418dce5b7ab830520a7db"
+          "sha256": "3e2d31f202b9303cfcbd71b2f904ec7c9567bf2563c34b3278a9be6ba16cb886"
         },
         "cuda128": {
           "type": "gpu",
@@ -61,8 +61,8 @@
           "type": "cpu",
           "cuda": null,
           "backend": "tf+jax+torch",
-          "url": "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cpu-Linux-x86_64.sh",
-          "sha256": "def3a36e7be1d378e21f8971ee8de32e6dfc146e1af8e77c519bf8d2a908712a"
+          "url": "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-db57d49-cpu-Linux-x86_64.sh",
+          "sha256": "fbbd3b02ae601360bd8ff389fd2b75fc5a437833b1f34aae83d05a87f5d9f7d9"
         }
       }
     }
