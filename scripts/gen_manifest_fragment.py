@@ -25,7 +25,10 @@ if not version:
     with open("assets/version.txt", encoding="utf-8") as fh:
         version = fh.read().strip()
 
-tag = f"v{version}"
+# Rolling nightly channel: ONE release tag holds the latest dated build of every
+# variant (PyTorch-style /whl/nightly). The deepmd version lives in the asset
+# filename + manifest "version" field, NOT the tag. Override with TAG if needed.
+tag = os.environ.get("TAG", "nightly")
 subdir = f"cuda{cuda.replace('.', '')}" if cuda else "cpu"
 base = f"https://github.com/{repo}/releases/download/{tag}"
 

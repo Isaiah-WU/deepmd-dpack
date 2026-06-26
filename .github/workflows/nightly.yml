@@ -61,15 +61,16 @@ jobs:
       contents: write            # 仅此任务(不跑 pip):确保 release 存在
     steps:
       - uses: actions/checkout@v4
-      - name: Ensure prerelease tag exists
+      - name: Ensure rolling nightly release exists
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v$(cat assets/version.txt)"
-          gh release view "$TAG" >/dev/null 2>&1 || \
-            gh release create "$TAG" --prerelease \
-              --title "DeePMD-kit $(cat assets/version.txt) offline installers" \
-              --notes "CI 自动构建。GPU 验证在玻尔外部进行;dpack 只安装 manifest 收录(已 GPU 验证)的变体。"
+          # 单一滚动通道(对照 PyTorch /whl/nightly):一个 nightly release 滚动存放
+          # 所有变体的最新日期构建;版本写在文件名里,不在 tag 上。
+          gh release view nightly >/dev/null 2>&1 || \
+            gh release create nightly --prerelease \
+              --title "DeePMD-kit nightly (rolling, GPU-verified channel)" \
+              --notes "CI 每日自动构建的离线安装包(滚动)。GPU 验证在玻尔外部进行;dpack 只安装 manifest 收录(已 GPU 验证)的变体。"
 
   build:
     name: Build ${{ matrix.label }}
@@ -119,7 +120,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v$(cat assets/version.txt)"
+          TAG="nightly"
           # 不删旧资产:新构建是带当天日期的新文件名,不会覆盖 manifest 引用的(已验证)资产。
           # --clobber 只在"同一天重跑、同名"时生效。
           mapfile -t parts < <(ls dist/${{ matrix.label }}/deepmd-kit-*.sh.[0-9]*)

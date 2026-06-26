@@ -6,6 +6,7 @@
 #   dpack install dp                  # auto-detect CUDA, download + install
 #   dpack install dp --cuda 12.8      # explicit CUDA version
 #   dpack install dp --file ./xxx.sh  # OFFLINE: install from a local .sh (no network)
+#   dpack install dp --file ./xxx.sh --sha256 <hex>   # OFFLINE + integrity check
 #   dpack install dp --prefix ~/dp    # custom install location
 #   dpack list                         # show installed tools
 #   dpack help                         # show this message
@@ -26,6 +27,38 @@ bold()  { printf "\033[1m%s\033[0m" "$*"; }
 green() { printf "\033[32m%s\033[0m" "$*"; }
 red()   { printf "\033[31m%s\033[0m" "\n$*" >&2; }
 warn()  { printf "\033[33m%s\033[0m" "$*" >&2; }
+
+# Verify a local installer's sha256 in OFFLINE mode.
+# Priority: explicit --sha256 (enforced) > a matching sha in the cached manifest
+# (enforced-by-match) > warn but proceed (pure-offline, nothing to check against).
+verify_offline_sha() {
+  local file="$1" want="$2"
+  local got; got="$(sha256sum "$file" | cut -d' ' -f1)"
+  if [[ -n "$want" ]]; then
+    if [[ "$got" != "$want" ]]; then red "SHA256 mismatch: expected $want, got $got"; exit 1; fi
+    echo "  $(green "✓") SHA256 verified (--sha256)"
+    return
+  fi
+  local found=""
+  if [[ -f "$DPACK_HOME/manifest.json" ]] && command -v python3 >/dev/null 2>&1; then
+    found="$(GOT="$got" python3 -c '
+import json, os, sys
+got = os.environ["GOT"]
+try: m = json.load(open(sys.argv[1]))
+except Exception: sys.exit(0)
+shas = {v.get("sha256") for t in m.get("tools", {}).values()
+        for v in t.get("variants", {}).values() if v.get("sha256")}
+print("yes" if got in shas else "")
+' "$DPACK_HOME/manifest.json" 2>/dev/null)"
+  fi
+  if [[ "$found" == "yes" ]]; then
+    echo "  $(green "✓") SHA256 verified (matches a manifest variant)"
+  elif [[ -f "$DPACK_HOME/manifest.json" ]]; then
+    warn "  ⚠ this file's sha256 is not in the cached manifest — source not verified (pass --sha256 to enforce)."; echo ""
+  else
+    warn "  ⚠ no cached manifest to verify against — pass --sha256 <hex> for offline integrity."; echo ""
+  fi
+}
 
 detect_cuda() {
   command -v nvidia-smi >/dev/null 2>&1 || { echo ""; return; }
@@ -67,13 +100,14 @@ pick_variant() {
 }
 
 cmd_install() {
-  local tool="${1:-}" cuda="" version="" localfile="" prefix="${DPACK_PREFIX:-$HOME/deepmd-kit}"
+  local tool="${1:-}" cuda="" version="" localfile="" sha_flag="" prefix="${DPACK_PREFIX:-$HOME/deepmd-kit}"
   shift || true
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --cuda)     cuda="$2"; shift 2 ;;
       --version)  version="$2"; shift 2 ;;
       --file)     localfile="$2"; shift 2 ;;
+      --sha256)   sha_flag="$2"; shift 2 ;;  # OFFLINE: enforce this sha256 on --file
       --prefix)   prefix="$2"; shift 2 ;;
       --backend)  shift 2 ;;  # future: per-backend download
       *)          shift ;;
@@ -94,6 +128,7 @@ cmd_install() {
     fi
     [[ -f "$localfile" ]] || { red "File not found: $localfile"; exit 1; }
     echo "  Offline install from $(bold "$localfile")"
+    verify_offline_sha "$localfile" "$sha_flag"
     echo "  Installing $tool to $prefix ..."
     bash "$localfile" -b -p "$prefix"
     record_install "$tool" "local" "$cuda" "$prefix"
