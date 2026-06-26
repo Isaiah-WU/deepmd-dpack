@@ -1,125 +1,56 @@
-# Verification Log — 开发验证记录（内部）
+# Verification Log — 开发验证记录(内部)
 
-> 这是**开发记录**，不是用户文档。记录在 Bohrium 上做过的验证、踩过的坑、技术发现。
-> 用户文档见 [README.md](../README.md)；构建/排查参考见 [notes.md](./notes.md)。
+> 开发记录,非用户文档(用户文档见 [README.md](../README.md))。
+> 测试平台:Bohrium,Tesla V100-16GB / T4,驱动 580.105(**CUDA 13.0**),镜像 ubuntu22.04-py3.10 / ubuntu24.04-py3.12 / ubuntu22.04-cuda12.1。deepmd-kit **3.2.0b0**。
 
-测试平台：Bohrium，节点 4× / 1× Tesla V100-SXM2-16GB，驱动 580.105（CUDA 13.0），
-镜像 ubuntu22.04-py3.10 与 ubuntu24.04-py3.12。
+## 1. 离线包变体与后端
 
----
+release `v3.2.0b0` 共 **5 个变体**:
 
-## 1. 安装方式
-
-| 方式 | 命令 | 状态 |
-|---|---|---|
-| dpack 引导安装（用户目录，无 root） | `curl install.sh \| bash` | ✅ |
-| dpack 离线安装（无网，本地包） | `dpack install dp --file ./xxx.sh` | ✅ |
-| dpack 在线安装（自动下载 3 片 → 合并 → sha256 校验 → 装） | `dpack install dp` | ✅ |
-
-dpack 在线安装的分片下载用 `curl --retry 5 -C -`（断点续传），扛住了一次 GitHub 503
-和一次 SSL EOF；前面下好的分片缓存复用。
-
-## 2. 跨镜像
-
-| 基础镜像 | 安装方式 | 状态 |
-|---|---|---|
-| ubuntu22.04-py3.10 | dpack 在线 + 离线 | ✅ |
-| ubuntu24.04-py3.12 | dpack 在线（下载 → 合并 → 校验 → 装） | ✅ |
-
-## 3. 端到端流程（`unshare -rn` 切网 → 安装 → train → freeze → lammps）
-
-| deepmd-kit | 变体 | 后端 | 训练数据 | 状态 |
+| 变体 | CUDA | GPU 计算后端 | 其它后端 | 构建方式 |
 |---|---|---|---|---|
-| 3.1.3 | CPU | TF + JAX | 合成 6 原子 | ✅ |
-| 3.2.0b0 | CPU | TF/JAX/PyTorch | dpa4 真实 192 原子 | ✅ |
-| 3.2.0b0 | GPU cuda129 | **PyTorch**（dpa4 真实场景） | 真实 + 合成 | ✅ |
-| 3.2.0b0 | GPU cuda129 | **TensorFlow** | 合成 6 原子 | ✅ |
+| `cpu`     | —    | —              | TF + JAX + PyTorch(CPU) | Mode A(conda-forge constructor) |
+| `cuda129` | 12.9 | TF + JAX + PyTorch | —                   | Mode A(conda-forge constructor) |
+| `cuda126` | 12.6 | **PyTorch**        | TF-CPU(仅插件)、无 JAX | Mode C(pip torch cu126 + conda-pack) |
+| `cuda128` | 12.8 | **PyTorch**        | TF-CPU(仅插件)、无 JAX | Mode C(pip torch cu128 + conda-pack) |
+| `cuda130` | 13.0 | **PyTorch**        | TF-CPU(仅插件)、无 JAX | Mode C(pip torch cu130 + conda-pack) |
 
-GPU LAMMPS 推理比 CPU 快约 10 倍（12ms vs 123ms）。
+**后端说明(重要,别误读):**
+- **cpu / cuda129(Mode A)**:来自 conda-forge 预编译包,带完整 TF + JAX + PyTorch;cuda129 三个后端都能做 GPU 计算。
+- **cuda126 / 128 / 130(Mode C)**:**GPU 计算只走 PyTorch**(torch 对应 cuXXX)。捆绑的 `tensorflow-cpu` **仅用于加载 LAMMPS 的 deepmd 插件**(插件入口硬 `import tensorflow`),**不参与 GPU 计算**;**不含 JAX**。
+- **为什么分两套**:conda-forge 每个 deepmd 发布只编一个 CUDA(3.2.0b0 = cuda129),要多 CUDA 必须自编;自编走 PyTorch 官方 pip 源取 torch(cu126/128/130 都有),而 TF 只有 `cu12`(CPU)能搭,所以 Mode C 以 PyTorch 为主。
 
-## 4. 多 CUDA 版本
+## 2. 各变体验证状态(诚实标注)
 
-### 4.1 3.2.0b0 只能是 cuda129
+| 变体 | 离线装 + dp/lmp 在位 + GPU 可见 | 完整 train→freeze→lammps |
+|---|---|---|
+| `cpu`     | ✅ | ✅ Mode A 基线(早期 Bohrium 实测,含 dpa4 真实 192 原子) |
+| `cuda129` | ✅ | ✅ Mode A 基线(PyTorch dpa4 + TensorFlow;GPU lammps 比 CPU 快约 10×) |
+| `cuda128` | ✅(GPU True 12.8) | ✅ 本会话实测:train + freeze + lammps MD;conda-pack 异地解压后仍跑通;`dpack install dp --cuda 12.8` 全新节点装通 |
+| `cuda126` | ✅(GPU True 12.6) | ⏳ 待验证道(玻尔 cron)补完整 MD |
+| `cuda130` | ✅(GPU True 13.0,13.0 原生) | ⏳ 待验证道(玻尔 cron)补完整 MD |
 
-deepmd 3.2.0b0 依赖 TF 2.19 + PyTorch 2.11（feedstock 钉死），两者 CUDA 构建交集只有 cuda129：
+> **manifest 只收录"完整验过"的变体——这是 dpack 选包的唯一闸门。** cuda126/130 目前是"装得上 + dp/lmp 在位 + GPU 可见"级别;完整 train→freeze→lammps 端到端由自动验证道持续补齐(见 README 自动发布闭环)。
 
-```
-TF 2.19     : cuda128, cuda129
-PyTorch 2.11: cuda129, cuda130
-交集        : cuda129
-```
-```bash
-conda search -c conda-forge "tensorflow=2.19" | grep -oE 'cuda[0-9]+' | sort -u  # cuda128 cuda129
-conda search -c conda-forge "pytorch=2.11"    | grep -oE 'cuda[0-9]+' | sort -u  # cuda129 cuda130
-```
+## 3. 安装方式(均已验证)
 
-cuda126/128/13x 对 3.2.0b0 都做不出（缺 TF 或缺 PyTorch），源码编也不行——上游构建不重合。
+- **dpack 引导**:`curl install.sh | bash`,装到用户目录、无需 root ✅
+- **dpack 在线**:自动读 `nvidia-smi` 检测驱动 CUDA → `pick_variant` 选变体 → 下分片 → `cat` 拼接 → sha256 校验 → 安装 ✅(分片下载用 `curl --retry 5 -C -` 断点续传,扛过 GitHub 503 / SSL EOF / 大文件瞬断)
+- **dpack 离线**:`--file` 指本地包,无网可装 ✅
+- **跨镜像**:ubuntu22.04-py3.10、ubuntu24.04-py3.12、ubuntu22.04-cuda12.1 均通过
 
-### 4.2 cuda128 源码编实证不可行
+## 4. Mode C 关键技术点(踩坑实录)
 
-feedstock（commit `5bd8a7e`）+ conda-build，dry-run 即证 PyTorch 2.11 无 cuda128：
-```bash
-CONDA_OVERRIDE_CUDA=12.8 conda create -n probe128 --dry-run \
-  -c conda-forge/label/deepmd-kit_rc -c conda-forge \
-  "cuda-version=12.8" "tensorflow=2.19.*=*cuda*" "pytorch=2.11.*=*cuda*"
-# → pytorch 2.11 requires cuda-version >=12.9  ⊥  cuda-version 12.8
-```
+- **TF 版本必须 `2.21.0`**:deepmd 3.2.0b0 的 pip wheel 实际对着 TF 2.21.0 编译(其 metadata 误标 2.18.1);装错版本 → `libdeepmd_op.so: undefined symbol: ...absl...MixingHashState...`。
+- **`e3nn` 必装**:3.2.0b0 的 PyTorch 描述符(sezm)`import e3nn`,缺了任何 `dp --pt` 命令在 import 阶段就崩。
+- **LAMMPS**:`lmp` 来自 PyPI `lammps[mpi]~=2025.7.22.2.0`;`pair_style deepmd` 来自 deepmd wheel 自带的 `libdeepmd_lmp.so`,靠 `LAMMPS_PLUGIN_PATH` 自动加载;插件入口硬 `import tensorflow`(故 Mode C 必带 `tensorflow-cpu`)。**不要用 conda-forge 的 lammps**(它的 deepmd 插件按 conda-forge 的 libdeepmd/libtorch 编,与 pip 的 cu128/torch 不是同一 ABI,dlopen 必失败)。
+- **conda-pack 打包**:env 含软链接目录,GNU tar 会对少数目录报 `Directory renamed before its status could be extracted`(**良性**:文件已解全,只是没设目录时间戳,退码非 0)→ 自解压脚本里 `tail … | tar -xz || true` + 校验 `bin/conda-unpack` 存在;**别加 `--delay-directory-restore`**(反而让所有目录都报)。
+- **relocation(异地可用)**:激活钩子用 `$CONDA_PREFIX` **动态**算 `LAMMPS_PLUGIN_PATH` + `LD_LIBRARY_PATH`(后者指向 torch 自带的 `nvidia-*-cu12` 库),**绝不硬编码绝对路径**;`conda-unpack` 一次性(跑完别再移动该目录)。已实测:解压到全新目录 → `source bin/activate`(裸 source,无 conda)→ `conda-unpack` → lmp MD 跑通。
+- **NVIDIA 兼容**:cuXXX 包靠向后兼容跑在更新的驱动上——cu126 / cu128 / cu130 在 T4 / 13.0 驱动上 GPU 均可见可用(`torch.cuda.is_available()=True`)。
+- **已知 bug**:`dp test`(Python 推理路径)在 3.2.0b0 有 TorchScript JIT bug(`ModelOutputDef is not found`),**不影响 LAMMPS(C++ 路径)与 train/freeze**;待报 deepmd upstream。
 
-### 4.3 conda-forge deepmd CUDA 矩阵（`conda search` 实测）
+## 5. 平台踩坑(Bohrium)
 
-```
-2.0.3~2.1.4    cuda102/110/111/112
-2.2.6~2.2.11   cuda112/118/120
-3.0.1~3.1.0    cuda126
-3.1.1          cuda126 + cuda129
-3.1.2~3.2.0b0  cuda129
-```
-3.1.1 有 cuda126 因配 TF 2.18；3.2.0b0 配 TF 2.19 故只有 cuda129。旧版无 dpa4，不能用。
-
-### 4.4 跨 CUDA 环境独立验证
-
-同一个 cuda129 包，dpack 安装 + 完整 train/freeze/lammps。Bohrium 实测（驱动统一 13.0，变 toolkit）：
-
-| CUDA 环境 | 造法 | GPU | 全流程 | 状态 |
-|---|---|---|---|---|
-| 无 toolkit | ubuntu24.04 镜像 | V100 | train+freeze+lammps | ✅ |
-| 12.1 | ubuntu22.04-cuda12.1 镜像 | T4 | 同上 | ✅ |
-| 12.6 | `conda install cuda-toolkit=12.6` | T4 | 同上 | ✅ |
-| 12.8 | `conda install cuda-toolkit=12.8` | T4 | 同上 | ✅ |
-| 13.0 | toolkit 13.0 + 驱动本就是 13.0 | T4 | 同上 | ✅ |
-| 13.1 | `conda install cuda-toolkit=13.1` | T4 | 同上 | ✅ |
-
-复现（以 12.6 为例）：
-```bash
-conda create -p /tmp/cuda126 -c conda-forge cuda-toolkit=12.6 -y
-export PATH="/tmp/cuda126/bin:$PATH"; nvcc --version | grep release
-bash scripts/verify_offline.sh ~/.dpack/cache/dp-cuda129.sh 3.2.0b0   # → VERIFY PASSED
-```
-
-机制：包自带 cuda129 运行时，不用宿主机 toolkit → 验证的是"宿主机任何 CUDA toolkit（12.1~13.1）
-下包都能独立装跑"。换真驱动版本需非 Bohrium 机器，但 cuda129 跨驱动可用由 NVIDIA 向后/minor 兼容保证。
-
-## 5. TF 后端 libdevice 修复
-
-**根因**：libmamba solver 损坏被迫退回 classic solver → `libdevice-hack-for-tensorflow`
-的符号链接断裂 → TF>=2.19 的 XLA JIT 报 `libdevice not found`。只影响 TF 后端，
-dpa4/PyTorch/JAX/CPU 不受影响。
-
-**修复**：
-- construct.yaml：pin `libdevice-hack-for-tensorflow=*=py_5` + 加 `cuda-nvvm`（保证真实目标存在）
-- post_install.sh：安装后自动把 `libdevice.10.bc` 重新软链到 `$PREFIX/nvvm/libdevice/`，
-  并写 activate hook 设 `XLA_FLAGS=--xla_gpu_cuda_data_dir=$CONDA_PREFIX`
-- 构建务必用 **libmamba** solver；用 /opt/mamba 的老 conda（22.11）不认 libmamba 插件，
-  需装新 Miniforge（conda 26.x）
-
-**回归验证**：用 libmamba 重新构建 cuda129 后，TF 后端 train + freeze + lammps 全跑通，
-零 libdevice 错误。
-
-## 6. 平台踩坑（Bohrium）
-
-- **磁盘**：GPU 安装包解压需 ~44 GB 临时空间。系统盘默认 40G 不够，要手动设 ≥ 100 GB。
-- **NAS 不能解压**：装到 `/personal`（阿里云 NFS）时 constructor 解压报 `InvalidArchiveError`
-  / BrokenProcessPool。必须装到本地盘。
-- **NAS 配额**：`/personal` 有配额，堆测试文件会 `Disk quota exceeded`。
-- **构建内存**：GPU 解 CUDA 依赖图吃内存，3.8 GB 节点会 OOM Killed，要 ≥ 8 GB（实际用 32G）。
-- **清华源 403**：Bohrium 上要去掉清华 channel，用 defaults + conda-forge。
+- 安装/解压必须用**本地盘**,别装到 `/personal`(阿里云 NFS,constructor/解压报 `InvalidArchiveError`)。
+- 大文件下载偏慢(~9 MB/s)、首次可能瞬时中断;dpack 的 `-C -` 续传重跑即可接上。
+- 旧节点 `git` 到 github.com 偶发 GnuTLS TLS 错,但 `pip` / `curl` 走 HTTPS 正常(release 资产上传/下载、api.github.com 均通)。

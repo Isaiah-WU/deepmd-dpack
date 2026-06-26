@@ -146,38 +146,40 @@ deepmd-dpack/
 └─ examples/ evals/       验证数据 / 质量评测
 ```
 
-### 自动发布闭环（nightly.yml）
+### 自动发布闭环
 
-**每天 UTC 02:17（北京时间 10:17）自动运行**（也会在 `construct.yaml` / `version.txt` / `build.sh` 改动推送时触发）：
+release `v3.2.0b0` 现有 **5 个变体**：`cpu + cuda126 + cuda128 + cuda129 + cuda130`，两套构建路线：
+- **Mode A**（conda-forge constructor）：`cpu` / `cuda129`，带完整 **TF + JAX + PyTorch**。
+- **Mode C**（自编 + conda-pack）：`cuda126` / `cuda128` / `cuda130`，**GPU 计算只走 PyTorch**（torch 对应 cuXXX）；另捆 CPU 版 TensorFlow 仅供 LAMMPS 的 deepmd 插件加载、不做 GPU 计算、不含 JAX。
+  （conda-forge 每个 deepmd 发布只编一个 CUDA = cuda129，所以要多 CUDA 必须自编。）
+
+**自动发布架构 = 构建 / 验证分离**（对标 PyTorch、conda-forge：都在无 GPU 的 CI 上构建 GPU 包，GPU 验证另放）：
 
 ```
-构建(cpu + cuda129) → 创建/更新 GitHub Release → 上传安装包（GPU 自动分片）
-                    → 重生 assets/manifest.json → 提交回 main
+GitHub Actions（CPU runner，每天）            玻尔 GPU（cron）
+  矩阵 cu126/128/130 → 构建 → 切片             下当天包 → 真跑 train/freeze/lammps
+  → 传 Release（标 prerelease）                → 通过才把该变体写进 manifest.json
+                                              ↑ manifest 是唯一放行闸：只收录 GPU 验过的变体
 ```
 
-手动触发：`Actions → Nightly Build & Publish → Run workflow`，`variant` 可选 `cpu` / `cuda129` / `all`。
+- **为什么这么分**：GitHub runner 没 GPU，只能做"构建"（pip 装 + conda-pack，不需 GPU）；"GPU 验证"（`torch.cuda` + train/freeze/lammps）放玻尔——GitHub 托管 GPU runner 对公开 repo 不免费，自建 runner 挂公开 repo 有 fork-PR 执行任意代码的风险，故 GPU 验证不放 CI。
+- **现状（诚实标注）**：Mode A（`cpu` / `cuda129`）的 nightly 自动构建**已上线**；Mode C（`cuda126/128/130`）的 CI 自动化 + 玻尔 cron 验证道**进行中**——当前这三个变体是**手动**构建、验证后写入 manifest 的。各变体验证状态见 [references/verification-log.md](references/verification-log.md)。
 
 ### 手动构建一个离线包
 
 ```bash
-git clone https://github.com/Isaiah-WU/deepmd-dpack.git
-cd deepmd-dpack
+# Mode A：cpu / cuda129（conda constructor）
+bash scripts/build.sh                 # CPU
+bash scripts/build.sh --cuda 12.9     # cuda129
+bash scripts/verify_offline.sh dist/*/*.sh $(cat assets/version.txt)   # 断网验收
 
-bash scripts/build.sh                 # CPU 版（约 10-15 分钟）
-bash scripts/build.sh --cuda 12.9     # GPU 版（覆盖 12.x~13.0 驱动）
-
-# 断网验收：切网 → 安装 → dp train → freeze → lammps 推理
-bash scripts/verify_offline.sh dist/*/*.sh $(cat assets/version.txt)
+# Mode C：cuda126 / 128 / 130（自编 + conda-pack，需 Linux GPU 节点）
+#   pip 装 torch(对应 cuXXX) + deepmd-kit 3.2.0b0 + e3nn + mpich +
+#   tensorflow-cpu 2.21.0 + lammps wheel → conda-pack → 包成自解压 .sh → 切片
+#   （Mode C 构建脚本随 CI 自动化一并纳入仓库，进行中）
 ```
 
-构建参数：`--version`、`--cuda`、`--backend {all,tensorflow,pytorch,jax}`、`--torch-version`、
-`--glibc`、`--example {dpa4,se_e2_a}`、`--split N`、`--from-commit-channel`。
-
-- **Mode A（默认）**：从 conda-forge 已发布的预编译包打包。有 conda 包的版本（如 3.2.0b0）用这个。
-- **Mode B（高级）**：conda-forge 没有的版本（某个未发布 commit），先源码编译到本地 channel 再打包，需 Docker。详见 [references/notes.md](references/notes.md)。
-
-> GPU 当前只有 `cuda129`：conda-forge 对每个 deepmd 版本只发一个 CUDA build，靠 minor 兼容
-> 覆盖整条 12.x 驱动线。多 CUDA 的查证与实测见 [references/verification-log.md](references/verification-log.md)。
+- **Mode B（高级）**：conda-forge 没有的未发布 commit，先源码编译到本地 channel 再打包，需 Docker。详见 [references/notes.md](references/notes.md)。
 
 ### License
 
