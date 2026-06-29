@@ -180,10 +180,16 @@ jobs:
 
   pass:
     name: Pass
-    needs: [build, prune]
+    # 必须 needs 全部"总会跑"的上游(setup/resolve/prepare),否则它们失败时 build 会变成
+    # skipped,被下面的 allowed-skips 容忍 → 假绿掩盖真失败。它们【不进 allowed-skips】= 必须成功。
+    needs: [setup, resolve, prepare, build, prune]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - uses: re-actors/alls-green@release/v1
         with:
+          # 只豁免 build/prune 的【skipped】(没新版的 no-op 夜):跳过不算失败。
+          # allowed-skips 只放宽到 {skipped,success};build/prune 真【运行并失败】仍会标红。
+          # setup/resolve/prepare 不在此列 → 它们失败必然标红(防假绿)。
+          allowed-skips: build, prune
           jobs: ${{ toJSON(needs) }}
