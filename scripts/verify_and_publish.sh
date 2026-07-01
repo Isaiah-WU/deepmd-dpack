@@ -32,9 +32,9 @@ echo "==> 匿名 clone(token 不落磁盘)"
 git clone "https://github.com/${REPO}.git" repo
 SKILL="$WORK/repo"
 
-# 单一滚动通道:固定 tag=nightly;deepmd 版本取自 version.txt(写进 manifest 的 version 字段)。
-TAG="${TAG:-nightly}"
+# 每版本一个 release:tag=v<version>;deepmd 版本取自 version.txt(写进 manifest 的 version 字段)。
 VER="$(cat "$SKILL/assets/version.txt" 2>/dev/null || echo 3.2.0b0)"
+TAG="${TAG:-v$VER}"
 echo "==> 目标 release: $TAG (deepmd $VER)"
 
 echo "==> 取 release 资产清单(匿名)"

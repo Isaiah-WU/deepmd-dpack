@@ -37,13 +37,13 @@
           "type": "gpu",
           "cuda": "13.1",
           "backend": "pytorch",
-          "note": "Same bytes as the cuda128 build (PyTorch CUDA 12.8). deepmd-kit 3.2.0b0 has NO native CUDA 13 build; this runs on a CUDA 13.1 driver via NVIDIA driver backward compatibility. The cuda128 recipe was verified (train + freeze + LAMMPS) on a 13.1/T4 node.",
+          "note": "Mode C (conda-pack self-extracting). PyTorch GPU backend; CPU-only TensorFlow bundled to load the LAMMPS plugin.",
           "parts": [
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda128-Linux-x86_64.sh.0",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda128-Linux-x86_64.sh.1",
-            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260625-f7512c5-cuda128-Linux-x86_64.sh.2"
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-d8951e7-cuda131-Linux-x86_64.sh.0",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-d8951e7-cuda131-Linux-x86_64.sh.1",
+            "https://github.com/Isaiah-WU/deepmd-dpack/releases/download/v3.2.0b0/deepmd-kit-3.2.0b0-20260626-d8951e7-cuda131-Linux-x86_64.sh.2"
           ],
-          "sha256": "8b25e263f036e4f4b1670bb592bfad931debf47801583f9d6559e646f2262db8"
+          "sha256": "5c1526db10b796d607a698dfb04da0ce98889cd53cea49506a85555c4a2830d3"
         },
         "cuda126": {
           "type": "gpu",

@@ -14,7 +14,7 @@ GitHub Releases 相反——资产持久、单文件 2GiB 上限、会无限堆�
 
 Env / args:
   REPO         owner/repo(默认 Isaiah-WU/deepmd-dpack)
-  TAG          release tag(默认 nightly)
+  TAG          release tag(必填,如 v3.2.0b0)
   KEEP_BUILDS  每变体保留的最近日期构建数(默认 2)
   MANIFEST     live manifest 的 URL 或本地路径(默认拉 raw main)
   GH_TOKEN     --apply 时删除资产需要(列资产可匿名)
@@ -28,10 +28,12 @@ import urllib.request
 from collections import defaultdict
 
 REPO = os.environ.get("REPO", "Isaiah-WU/deepmd-dpack")
-TAG = os.environ.get("TAG", "nightly")
+TAG = os.environ.get("TAG", "")  # required: per-version release tag, e.g. v3.2.0b0
 KEEP = int(os.environ.get("KEEP_BUILDS", "2"))
 APPLY = "--apply" in sys.argv
 TOKEN = os.environ.get("GH_TOKEN", "")
+if not TAG:
+    sys.exit("prune: TAG 必填(如 TAG=v3.2.0b0);拒绝在未指定 release 上运行,以免误删。")
 MANIFEST = os.environ.get(
     "MANIFEST", f"https://raw.githubusercontent.com/{REPO}/main/assets/manifest.json"
 )
