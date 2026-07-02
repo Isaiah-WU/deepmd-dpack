@@ -84,7 +84,6 @@ bash scripts/verify_offline.sh dist/<variant>/*.sh 3.2.0b0
 | `cuda129` | V100 / CUDA 12.9 | ✅ train + freeze + lammps 完成 |
 | `cuda131` | 13.1 精确匹配 | ✅ = cuda128 同一份字节 |
 | SPIN 能力 | cuda126 包内探测 | ✅ LAMMPS 带 SPIN package，`pair_style deepspin` 存在（支持 spin/dpa4 自旋模型） |
-| `cuda130`（已弃） | 13.1 / T4 | ❌ CUDA-13 torch 让 lammps JIT 内核崩（时好时坏），已从矩阵与 manifest 移除 |
 
 > ⚠️ 历史更正：早前“5 变体全部完整验证”对 `cuda130` 是过度宣称（当时 LAMMPS 未真跑）。经 13.1/T4 严格测试 `cuda130` 崩溃，已弃。本表只标实际跑通的结果。
 
