@@ -157,16 +157,26 @@ jobs:
 
       - name: Smoke test (no GPU — 装上 + dp --version + import deepmd)
         run: |
-          # 这就是导师要的"打包流程验证":不需 GPU,只证明装得上、能 import、dp 能跑。
+          # 打包流程验证:不需 GPU,只证明装得上、能 import、dp 能跑。
+          # runner 上 setup-miniconda 已激活了一个 base conda,不能用 conda activate /
+          # source bin/activate(会激活错误的 base;conda-pack 环境里它自身还会返回非零触发 set -e)。
+          # 改为手动激活:CONDA_PREFIX 指向新 env → PATH 前置 → source activate.d 钩子
+          # (补 Mode C 的 torch/lmp LD_LIBRARY_PATH、Mode A 的 XLA_FLAGS)→ 绝对路径调 dp/python。
           sh_file="$(ls dist/${{ matrix.label }}/deepmd-kit-*.sh)"
           echo "smoke: installing $sh_file"
           rm -rf /tmp/smoke
           bash "$sh_file" -b -p /tmp/smoke
-          set +u; source /tmp/smoke/bin/activate; set -u
-          dp --version
-          python -c "import deepmd; print('deepmd', getattr(deepmd, '__version__', '?'))"
-          if command -v lmp >/dev/null 2>&1; then lmp -h >/dev/null 2>&1 && echo "lmp -h OK"; fi
-          set +u; conda deactivate 2>/dev/null || true; set -u
+          export CONDA_PREFIX=/tmp/smoke
+          export PATH="/tmp/smoke/bin:$PATH"
+          if [ -d /tmp/smoke/etc/conda/activate.d ]; then
+            for _h in /tmp/smoke/etc/conda/activate.d/*.sh; do
+              [ -e "$_h" ] || continue
+              set +u; . "$_h"; set -u
+            done
+          fi
+          /tmp/smoke/bin/dp --version
+          /tmp/smoke/bin/python -c "import deepmd; print('deepmd', getattr(deepmd, '__version__', '?'))"
+          if [ -x /tmp/smoke/bin/lmp ]; then /tmp/smoke/bin/lmp -h >/dev/null 2>&1 && echo "lmp -h OK"; fi
           rm -rf /tmp/smoke
           echo "✅ 冒烟测试通过:${{ matrix.label }}"
 
