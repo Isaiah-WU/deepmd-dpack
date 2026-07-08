@@ -99,8 +99,10 @@ bash scripts/verify_offline.sh dist/<variant>/*.sh 3.2.0b0
   ⑤ 包内 `mpirun -n 2 lmp` 通过 ⑥ 用户 conda 激活时不冲突（`CONDA_PREFIX` 不变、`dp` 指向本包）⑦ `unshare -rn` 断网下装 + 激活 + dp 可跑。
 - **2026-07-08 cu128 同流程**：构建成功（torch 2.11.0+cu128，产物 4.3 GB，比 conda-pack 版 cuda128 的 4.68 GB 小约 8%），`verify_modec2.sh` 同样 **7 项全 PASS、0 SKIP**（含 T4 + CUDA 13.0 驱动跑 cu128 包的 GPU 端到端）。
   - 技术细节：cu128 的 torch wheel 不像 cu126 那样把 CUDA 库打进 torch 内部，而是依赖外置的 `nvidia-*-cu12` pip 包（cudnn/cublas/nccl/triton 等,故包更大）——`env.sh` 把 `site-packages/nvidia/*/lib` 加入 `LD_LIBRARY_PATH` 的设计正是为此，第 4 项通过即证明该机制闭环。
-- **结论**：conda-free 离线包路线**可行性实证成立**，cu126 / cu128 两个 GPU 变体均全项通过（安装=解压，激活=`source <prefix>/env.sh`，全程无 conda）。
-- 待办：CPU 变体（同配方换 `whl/cpu`）；接入 nightly（冒烟测试需按 env.sh 激活方式分支）；dpack 安装完成提示对 C2 包应打印 `source <prefix>/env.sh`。
+- **2026-07-08 CPU 变体**：`build_modec2.sh cpu`（torch 走 `whl/cpu`，其余配方零差异）构建成功，产物仅 **788 MB**（conda constructor 版 CPU 包 1.41 GB，**小 44%**，且 <2GiB 无需切片）。`verify_modec2.sh` 同样 **7 项全 PASS、0 SKIP**（第 4 项为 `DP_DEVICE=cpu` 的 CPU 端到端 train → freeze → lammps）。
+  - 途中修复一个验证脚本误判：CPU 版 torch 没有 libcudart，deepmd 的 dyn-cudart dlopen 探测失败后打印 "Cannot find libcudart.so.12" 并正常走 CPU（官方设计）；该提示原被无条件列入 lammps 失败黑名单（为抓 cuda130 式 GPU 崩溃而设），导致实际跑通的 CPU 端到端被判 FAIL。现改为仅 GPU 模式保留该黑名单项（commit 8dcc318）。
+- **结论**：conda-free 离线包路线**可行性实证成立**，`cpu` / `cuda126` / `cuda128` 三个变体均 7 项全过（安装=解压，激活=`source <prefix>/env.sh`，全程无 conda）。
+- 待办：接入 nightly（冒烟测试需按 env.sh 激活方式分支）；dpack 安装完成提示对 C2 包应打印 `source <prefix>/env.sh`。
 - 注意：C2 包要求目标机 **glibc ≥ 2.28**（manylinux_2_28 wheel + PBS 门槛，高于 conda 系包的 2.17）。
 
 ## 7 · 发布模型 & manifest & dpack 选包
