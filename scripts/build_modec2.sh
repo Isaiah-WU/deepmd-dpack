@@ -27,7 +27,9 @@ TORCH_SPEC="${TORCH_SPEC:-torch==2.11.*}"
 LAMMPS_SPEC="${LAMMPS_SPEC:-lammps[mpi]~=2025.7.22.2.0}"
 
 # python-build-standalone(astral):钉死版本以可复现。cp311 与现配方的 wheel ABI 一致。
-PBS_PYVER="${PBS_PYVER:-3.11.9}"
+# 注意:PBS 每期 release 只上架【当期最新】小版本;PBS_PYVER 与 PBS_DATE 必须配对存在
+# (3.11.9+20250612 不存在 → 404;20250612 期上架的是 3.11.13,已实测 HTTP 200)。
+PBS_PYVER="${PBS_PYVER:-3.11.13}"
 PBS_DATE="${PBS_DATE:-20250612}"
 PBS_URL="${PBS_URL:-https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_DATE}/cpython-${PBS_PYVER}+${PBS_DATE}-x86_64-unknown-linux-gnu-install_only.tar.gz}"
 

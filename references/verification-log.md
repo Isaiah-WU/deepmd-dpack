@@ -87,6 +87,22 @@ bash scripts/verify_offline.sh dist/<variant>/*.sh 3.2.0b0
 
 > ⚠️ 历史更正：早前“5 变体全部完整验证”对 `cuda130` 是过度宣称（当时 LAMMPS 未真跑）。经 13.1/T4 严格测试 `cuda130` 崩溃，已弃。本表只标实际跑通的结果。
 
+### 6.1 · Mode C2（conda-free 原型）实测记录
+
+平台：Bohrium 容器（Ubuntu，glibc 2.39，driver 580.105.08 / CUDA 13.0，Tesla T4，root）。
+
+- **2026-07-03 构建**：`build_modec2.sh cu126` 首次真机构建成功（7 步全过，import 自检通过：torch 2.11.0+cu126 / deepmd 3.2.0b0 / tensorflow-cpu 2.21.0 / lammps wheel / 插件目录解析正常）。产物 3.9 GB —— 比 conda-pack 版 cuda126（4.26 GB）小约 8%。
+  - 途中修复一个原型 bug：`PBS_PYVER` 默认 3.11.9 与货架 `20250612` 不配对（404）——PBS 每期 release 只上架**当期最新**小版本，改为 3.11.13（实测 HTTP 200）。构建时用 `PBS_PYVER=3.11.13` 覆盖，脚本默认值已同步修正。
+- **2026-07-08 验证**：`verify_modec2.sh` **7 项全 PASS、0 FAIL、0 SKIP**：
+  ① 装 + import ② 换目录重定位（shebang 已重写为 `#!/usr/bin/env python3`）③ env.sh 正确
+  ④ **GPU 端到端 train → freeze → lammps 通过（T4，CUDA 13.0 驱动跑 cu126 包 —— NVIDIA 驱动向后兼容的实测证据）**
+  ⑤ 包内 `mpirun -n 2 lmp` 通过 ⑥ 用户 conda 激活时不冲突（`CONDA_PREFIX` 不变、`dp` 指向本包）⑦ `unshare -rn` 断网下装 + 激活 + dp 可跑。
+- **2026-07-08 cu128 同流程**：构建成功（torch 2.11.0+cu128，产物 4.3 GB，比 conda-pack 版 cuda128 的 4.68 GB 小约 8%），`verify_modec2.sh` 同样 **7 项全 PASS、0 SKIP**（含 T4 + CUDA 13.0 驱动跑 cu128 包的 GPU 端到端）。
+  - 技术细节：cu128 的 torch wheel 不像 cu126 那样把 CUDA 库打进 torch 内部，而是依赖外置的 `nvidia-*-cu12` pip 包（cudnn/cublas/nccl/triton 等,故包更大）——`env.sh` 把 `site-packages/nvidia/*/lib` 加入 `LD_LIBRARY_PATH` 的设计正是为此，第 4 项通过即证明该机制闭环。
+- **结论**：conda-free 离线包路线**可行性实证成立**，cu126 / cu128 两个 GPU 变体均全项通过（安装=解压，激活=`source <prefix>/env.sh`，全程无 conda）。
+- 待办：CPU 变体（同配方换 `whl/cpu`）；接入 nightly（冒烟测试需按 env.sh 激活方式分支）；dpack 安装完成提示对 C2 包应打印 `source <prefix>/env.sh`。
+- 注意：C2 包要求目标机 **glibc ≥ 2.28**（manylinux_2_28 wheel + PBS 门槛，高于 conda 系包的 2.17）。
+
 ## 7 · 发布模型 & manifest & dpack 选包
 
 - **每版本一个 Release**：tag `v<version>`（如 `v3.2.0b0`），存放该版本所有变体的分片。deepmd 出新版 → CI 建新 release `v<新版本>`，manifest top-level version 随最新片段前移。
