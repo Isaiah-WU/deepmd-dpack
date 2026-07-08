@@ -50,7 +50,11 @@ printf 'units metal\natom_style atomic\nboundary p p p\nread_data data.lmp\npair
 lmp -in in.lammps >lmp.log 2>&1 || true
 # ① 命中明确错误标志 → 判失败(即使退出码 0)。
 #    "Cannot find libcudart" 不会误伤成功时的 "Successfully load libcudart"(子串不同)。
-if grep -qiE 'Cannot find libcudart|Unknown pair style|MPI_Abort|terminate called' lmp.log; then
+#    CPU 模式例外:CPU 版 torch 本就没有 libcudart,deepmd 的 dlopen 探测会打印这句后
+#    正常走 CPU(设计如此),不是错误标志——只在 GPU 模式下把它列入黑名单。
+ERRPAT='Unknown pair style|MPI_Abort|terminate called'
+[ "${DP_DEVICE:-gpu}" = "cpu" ] || ERRPAT="Cannot find libcudart|$ERRPAT"
+if grep -qiE "$ERRPAT" lmp.log; then
   echo "❌ lammps 出现错误标志(见下)"; tail -25 lmp.log; exit 1
 fi
 # ② 必须真跑完(崩在半路不会打印这行)——核心成功信号。
