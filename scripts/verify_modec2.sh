@@ -12,6 +12,8 @@ set -uo pipefail
 SH="${1:?用法: bash scripts/verify_modec2.sh <installer.sh>}"
 SKILL="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [ -f "$SH" ] || { echo "找不到安装包: $SH"; exit 1; }
+# CPU 包(文件名含 -cpu-):第 4 项走 DP_DEVICE=cpu 的端到端,任意机器可跑
+case "$(basename "$SH")" in *-cpu-*) PKG_KIND=cpu;; *) PKG_KIND=gpu;; esac
 pass=0; fail=0; skip=0
 ok(){ echo "   ✅ $*"; pass=$((pass+1)); }
 no(){ echo "   ❌ $*"; fail=$((fail+1)); }
@@ -54,17 +56,21 @@ if ( set -e; source /tmp/dp1/env.sh
       [ -z "$d" ] || [ -d "$d" ] || echo "   ⚠ LD_LIBRARY_PATH 里不存在的目录: $d"; done )
 else no "env.sh source 出错或路径不对"; fi
 
-# ── [4] GPU 端到端:train → freeze → lammps(需 GPU 节点)──────────────────────
-echo "== [4] GPU 端到端(需 GPU)=="
-if command -v nvidia-smi >/dev/null 2>&1; then
+# ── [4] 端到端:train → freeze → lammps(GPU 包需 GPU 节点;CPU 包任意机器)────
+echo "== [4] 端到端 train → freeze → lammps =="
+if [ "$PKG_KIND" = "cpu" ]; then
+  if ( set +u; source /tmp/dp1/env.sh; set -u; DP_DEVICE=cpu bash "$SKILL/scripts/verify_offline_modec.sh" ); then
+    ok "CPU 端到端 train → freeze → lammps 通过"
+  else no "CPU 端到端失败"; fi
+elif command -v nvidia-smi >/dev/null 2>&1; then
   if ( set +u; source /tmp/dp1/env.sh; set -u; bash "$SKILL/scripts/verify_offline_modec.sh" ); then
     ok "train → freeze → lammps 通过"
   else no "GPU 端到端失败"; fi
 else sk "无 GPU,跳过(务必在 GPU 节点重跑这一项)"; fi
 
-# ── [5] 打包内 MPICH 多进程:用【包内】mpirun,别用系统的 ───────────────────────
+# ── [5] 打包内 MPICH 多进程:用【包内】mpirun,别用系统的(纯 CPU 的 LJ 算例)────
 echo "== [5] bundled MPICH 多进程 =="
-if command -v nvidia-smi >/dev/null 2>&1 && [ -x /tmp/dp1/python/bin/mpirun ]; then
+if [ -x /tmp/dp1/python/bin/mpirun ]; then
   printf 'units lj\natom_style atomic\nlattice fcc 0.8442\nregion b block 0 4 0 4 0 4\ncreate_box 1 b\ncreate_atoms 1 box\nmass 1 1.0\npair_style lj/cut 2.5\npair_coeff 1 1 1.0 1.0\nrun 0\n' > /tmp/in.mini
   if ( set +u; source /tmp/dp1/env.sh; set -u
        /tmp/dp1/python/bin/mpirun -n 2 lmp -in /tmp/in.mini ) >/tmp/dp1.mpi.log 2>&1; then

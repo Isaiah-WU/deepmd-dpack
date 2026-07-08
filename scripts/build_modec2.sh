@@ -13,12 +13,13 @@
 # pip 那一层(torch / deepmd / e3nn / mpich / tensorflow-cpu / lammps wheel)与 build_modec.sh
 # 【逐字一致】—— 这层本就是 conda-free 的,不动。
 #
-# 用法:  bash scripts/build_modec2.sh cu126        # (或 cu128)
-# 产出:  /tmp/deepmd-kit-<VER>-<DATE>-<HASH>-cuda<XXX>-nocondan-Linux-x86_64.sh
+# 用法:  bash scripts/build_modec2.sh cu126        # (或 cu128 / cpu)
+# 产出:  /tmp/deepmd-kit-<VER>-<DATE>-<HASH>-<cudaXXX|cpu>-nocondan-Linux-x86_64.sh
 set -euo pipefail
 
-CU="${1:?用法: bash build_modec2.sh cu126|cu128}"
-NUM="${CU#cu}"; VARIANT="cuda${NUM}"
+CU="${1:?用法: bash build_modec2.sh cu126|cu128|cpu}"
+# cpu 与 cuXXX 走同一条流水线:torch 的 --index-url whl/cpu 与 whl/cuXXX 同构,其余零差异
+if [ "$CU" = "cpu" ]; then VARIANT="cpu"; else NUM="${CU#cu}"; VARIANT="cuda${NUM}"; fi
 VER="${DEEPMD_VER:-3.2.0b0}"
 DATE="${BUILD_DATE:-$(date +%Y%m%d)}"
 HASH="${BUILD_HASH:-$(git rev-parse --short HEAD 2>/dev/null || echo manual)}"

@@ -1,18 +1,26 @@
 #!/usr/bin/env bash
-# verify_offline_modec.sh — 在【已激活】的 Mode C 环境里做 GPU 端到端验证。
-#   要求:torch 看得见 GPU → dp --pt train(合成数据,10 步)→ dp --pt freeze → lammps MD 跑完。
-#   全过 exit 0;任一步失败 exit 非 0。作为一次性 GPU 端到端验证在 GPU 节点手动运行。
-# 用法:先 `source <prefix>/bin/activate`,再 `bash verify_offline_modec.sh`。
+# verify_offline_modec.sh — 在【已激活】的 Mode C/C2 环境里做端到端验证。
+#   要求:torch 看得见 GPU(CPU 模式除外)→ dp --pt train(合成数据,10 步)→ dp --pt freeze → lammps MD 跑完。
+#   全过 exit 0;任一步失败 exit 非 0。作为一次性端到端验证手动运行(GPU 包在 GPU 节点)。
+# 用法:先 `source <prefix>/bin/activate`(C2 包用 `source <prefix>/env.sh`),再 `bash verify_offline_modec.sh`。
+#   CPU 包:DP_DEVICE=cpu bash verify_offline_modec.sh(跳过 GPU 断言,任意机器可跑)。
 set -euo pipefail
 
 command -v dp  >/dev/null || { echo "dp 不在 PATH(环境没激活?)"; exit 1; }
 command -v lmp >/dev/null || { echo "lmp 不在 PATH"; exit 1; }
 
+if [ "${DP_DEVICE:-gpu}" = "cpu" ]; then
+python - <<'PY'
+import torch
+print("CPU 模式 | torch", torch.__version__)
+PY
+else
 python - <<'PY'
 import torch
 assert torch.cuda.is_available(), "GPU 不可见(驱动/CUDA 不匹配,或不在 GPU 节点)"
 print("GPU:", torch.cuda.get_device_name(0), "| torch", torch.__version__, "| cuda", torch.version.cuda)
 PY
+fi
 
 D=$(mktemp -d); cd "$D"
 python - <<'PY'
@@ -50,4 +58,4 @@ grep -qE 'Total wall time' lmp.log || { echo "❌ lammps 未跑完(无 Total wal
 # ③ deepmd 是否参与:Mode A 可能编进 lmp、Mode C 走插件,措辞不同;只告警不判失败,避免误伤。
 grep -qiE 'deepmd' lmp.log || echo "⚠ 日志未见 'deepmd' 字样(已跑完;通常只是措辞差异)"
 
-echo "✅ 端到端验证通过:torch GPU + dp train + dp freeze + lammps MD(跑完、无错误标志)"
+echo "✅ 端到端验证通过:torch(${DP_DEVICE:-gpu}) + dp train + dp freeze + lammps MD(跑完、无错误标志)"
